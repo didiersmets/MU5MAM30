@@ -1,4 +1,4 @@
-Github repo for the students of the cours MU5MAM30 : Implementation of the Finite Element Method.
+Github repo for the students of the course MU5MAM30 : Implementation of the Finite Element Method.
 Tutorial classes on Friday 2pm to 5pm in 16-26 401
 
 To get write permission access to this repo, first clone it using the _token_ that 
