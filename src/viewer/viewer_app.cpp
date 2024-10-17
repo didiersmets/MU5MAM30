@@ -3,7 +3,7 @@
 #include <string.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -12,11 +12,12 @@
 
 #include "viewer_app.h"
 
-#include "chrono.h"
 #include "camera.h"
+#include "chrono.h"
 #include "cube.h"
 #include "mesh_bounds.h"
 #include "mesh_io.h"
+#include "ndc.h"
 #include "shaders.h"
 #include "sphere.h"
 #include "trackball.h"
@@ -33,8 +34,7 @@ void syntax(char *prg_name)
 	exit(EXIT_FAILURE);
 }
 
-ViewerApp::ViewerApp(int argc, char **argv)
-	: GUIApp("Viewer")
+ViewerApp::ViewerApp(int argc, char **argv) : GUIApp("Viewer")
 {
 	Timer chrono;
 	chrono.start();
@@ -79,8 +79,8 @@ void ViewerApp::opengl_init()
 {
 	GUIApp::opengl_init();
 
-	shader = create_shader("./shaders/default.vert",
-			       "./shaders/default.frag");
+	shader =
+	    create_shader("./shaders/default.vert", "./shaders/default.frag");
 	if (!shader)
 		exit(EXIT_FAILURE);
 
@@ -114,9 +114,8 @@ void ViewerApp::mouse_button_callback(int button, int action, int mods)
 		float ty = height - py;
 		glReadPixels(tx, ty, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT,
 			     &depth);
-
 		/* Don't track clicks outisde of model */
-		if (approx_equal(depth, 1.f)) {
+		if (approx_equal(depth, 1.f - reversed_z)) {
 			return;
 		}
 		target = camera.world_coord_at(px / width, py / height, depth);
@@ -181,7 +180,7 @@ void ViewerApp::scroll_callback(double xoffset, double yoffset)
 	(void)xoffset;
 	Vec3 old_pos = camera.get_position();
 	Vec3 new_pos = target + exp(-ZOOM_SENSITIVITY * (float)yoffset) *
-					(old_pos - target);
+				    (old_pos - target);
 	camera.set_position(new_pos);
 }
 
@@ -227,7 +226,8 @@ void ViewerApp::draw_scene()
 {
 	if (draw_surface) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(-1.f, -1.f);
+		float offset = reversed_z ? -1.f : 1.f;
+		glPolygonOffset(offset, offset);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glUniform1i(3, true);
 		gpu_mesh.draw();

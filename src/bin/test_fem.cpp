@@ -2,12 +2,12 @@
 
 #include "P1.h"
 #include "chrono.h"
+#include "conjugate_gradient.h"
 #include "cube.h"
 #include "fem_matrix.h"
 #include "mesh.h"
 #include "mesh_io.h"
 #include "sphere.h"
-#include "conjugate_gradient.h"
 #include "tiny_blas.h"
 
 void syntax(char *prg_name)
@@ -18,10 +18,7 @@ void syntax(char *prg_name)
 	exit(EXIT_FAILURE);
 }
 
-static double test_f(Vec3 pos)
-{
-	return pos[0];
-}
+static double test_f(Vec3 pos) { return pos[0]; }
 
 static void fill_rhs(const Mesh &mesh, TArray<double> &f)
 {
@@ -64,8 +61,6 @@ static size_t system_solve(const Mesh &m, const TArray<double> &f,
 	add_mass_to_stiffness(S, M);
 
 	M.mvp(f.data, b.data);
-	printf("f : %g, b : %g\n", blas_dot(f.data, f.data, N) / N,
-	       blas_dot(b.data, b.data, N) / N);
 
 	size_t iter = conjugate_gradient_solve(S, b.data, u.data, r.data,
 					       p.data, Ap.data, 1e-6, max_iter);

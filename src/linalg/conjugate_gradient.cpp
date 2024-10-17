@@ -12,12 +12,10 @@ size_t conjugate_gradient_solve(const Matrix &A, const double *__restrict b,
 				double tol, int max_iter)
 {
 	size_t N = A.rows;
-	printf("N : %zu\n", N);
 	assert(A.rows == A.cols);
 
 	/* Absolute squared tolerance */
 	double normsqb = blas_dot(b, b, N) / N;
-	printf("Normsqb : %f\n", normsqb);
 	double tol2 = (tol * tol) * normsqb;
 
 	/* r_0 = b - Ax_0 */
@@ -45,6 +43,7 @@ size_t conjugate_gradient_solve(const Matrix &A, const double *__restrict b,
 		/* beta_k = r_{k+1}^Tr_{k+1} / (r_k^T r_k) */
 		double beta = 1.0 / error2;
 		error2 = blas_dot(r, r, N);
+		/* TODO user callback instead */
 		printf("Iteration %d : %g (%g)\r", iter, error2,
 		       sqrt(error2 / normsqb));
 		fflush(stdout);
