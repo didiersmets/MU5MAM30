@@ -1,5 +1,5 @@
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "P1.h"
 #include "fem_matrix.h"
@@ -105,12 +105,12 @@ void build_P1_mass_matrix(const Mesh &m, FEMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M.diag[a] += Mloc[0];
@@ -141,12 +141,12 @@ void build_P1_stiffness_matrix(const Mesh &m, FEMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S.diag[a] += Sloc[0];
@@ -188,11 +188,11 @@ void build_P1_stiffness_matrix(const Mesh &m, FEMatrix &S)
  * M' = (1/24) * (1  2  1)
  *               (1  1  2)
  *
- * We therefore only return |ABC|/12 and |ABC|/24, with |ABC| = |AB x AC| / 2.
+ * We therefore only return |ABC|/6 and |ABC|/12, with |ABC| = |AB x AC| / 2.
  */
 void inline mass(const Vec3d &AB, const Vec3d &AC, double *__restrict M)
 {
-	M[0] = norm(cross(AB, AC)) / 24;
+	M[0] = norm(cross(AB, AC)) / 12;
 	M[1] = M[0] / 2;
 }
 
