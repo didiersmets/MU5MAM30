@@ -14,5 +14,5 @@ struct GPUMesh {
 	GLuint idx_vbo;
 	GLuint vao;
 	void upload();
-	void draw();
+	void draw() const;
 };

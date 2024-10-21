@@ -71,8 +71,8 @@ Camera &Camera::set_orthographic(bool is_ortho)
 }
 
 Vec3 Camera::get_position() const { return (position); }
-
 Quat Camera::get_rotation() const { return rotation; }
+Vec3 Camera::get_target() const { return target; }
 
 Camera &Camera::set_position(const Vec3 &position)
 {
@@ -83,6 +83,12 @@ Camera &Camera::set_position(const Vec3 &position)
 Camera &Camera::set_rotation(const Quat &rotation)
 {
 	this->rotation = rotation;
+	return (*this);
+}
+
+Camera &Camera::set_target(const Vec3 &target)
+{
+	this->target = target;
 	return (*this);
 }
 
@@ -97,20 +103,33 @@ Camera &Camera::translate(const Vec3 &t, Space coord)
 	return (*this);
 }
 
-Camera &Camera::rotate(const Quat &r)
+Camera &Camera::rotate(const Quat &r, Space coord)
 {
 	assert(!approx_equal(norm(r), 0.f));
 	Quat rot = r * (1.f / norm(r));
+	if (coord == View) {
+		rot.xyz = ::rotate(rot.xyz, rotation);
+	}
 	rotation = compose(rotation, rot);
 	return (*this);
 }
 
-Camera &Camera::orbit(const Quat &r, const Vec3 &pivot)
+Camera &Camera::orbit(const Quat &r, Space coord)
 {
 	assert(!approx_equal(norm(r), 0.f));
 	Quat rot = r * (1.f / norm(r));
+	if (coord == View) {
+		rot.xyz = ::rotate(rot.xyz, rotation);
+	}
 	rotation = compose(rotation, rot);
-	position = ::orbit(position, rot, pivot);
+	position = ::orbit(position, rot, target);
+	return (*this);
+}
+
+Camera &Camera::zoom(float factor)
+{
+	Vec3 new_pos = target + (1.f / factor) * (position - target);
+	set_position(new_pos);
 	return (*this);
 }
 
@@ -192,6 +211,18 @@ Vec3 Camera::world_coord_at(float x, float y, float depth) const
 	Vec3 ndc = nwd_to_ndc(x, y, depth);
 
 	return transform(clip_to_world(), ndc);
+}
+
+void Camera::save_spatial_state()
+{
+	saved_rotation = rotation;
+	saved_position = position;
+}
+
+void Camera::restore_spatial_state()
+{
+	rotation = saved_rotation;
+	position = saved_position;
 }
 
 int is_visible(const float *vtx, int n, const float *pvm)

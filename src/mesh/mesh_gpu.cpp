@@ -42,7 +42,7 @@ void GPUMesh::upload()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
-void GPUMesh::draw()
+void GPUMesh::draw() const
 {
 	glBindVertexArray(vao);
 	glDrawElements(GL_TRIANGLES, m->indices.size, GL_UNSIGNED_INT,

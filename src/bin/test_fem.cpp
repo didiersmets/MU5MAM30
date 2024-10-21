@@ -18,7 +18,12 @@ void syntax(char *prg_name)
 	exit(EXIT_FAILURE);
 }
 
-static double test_f(Vec3 pos) { return pos[0]; }
+static double test_f(Vec3 pos)
+{
+	float x = pos[0];
+	float y = pos[1];
+	return (5 * pow(x, 4) * y - 10 * pow(x, 2) * pow(y, 3) + pow(y, 5));
+}
 
 static void fill_rhs(const Mesh &mesh, TArray<double> &f)
 {

@@ -6,6 +6,7 @@ project(MU5MAM30)
 add_executable(test_fem 
 	src/bin/test_fem.cpp
 	src/common/chrono.cpp
+	src/mesh/duplicate_verts.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
 	src/mesh/mesh_io.cpp
@@ -20,20 +21,20 @@ target_include_directories(test_fem PRIVATE
 	include/linalg
 	extern
 )
-target_compile_options(test_fem PUBLIC -Wall -Wextra)
+target_compile_options(test_fem PUBLIC -Wall -Wextra -ffast-math -march=native)
 ###############################################################################
 
 ###############################################################################
 add_executable(test_viewer
 	src/bin/test_viewer.cpp
 	src/common/chrono.cpp
+	src/mesh/duplicate_verts.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
 	src/mesh/mesh_bounds.cpp
 	src/mesh/mesh_gpu.cpp
 	src/mesh/mesh_io.cpp
-	src/viewer/gui_app.cpp
-	src/viewer/viewer_app.cpp
+	src/viewer/viewer.cpp
 	src/viewer/camera.cpp
 	src/viewer/frustum.cpp
 	src/viewer/mouse.cpp

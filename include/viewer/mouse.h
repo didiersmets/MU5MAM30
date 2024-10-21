@@ -10,6 +10,6 @@ struct Mouse {
 	double last_click_time[3] = {0};
 	int mods[3] = {0};
 
-	void button(int button, int action, int mods);
-	void move(double x, double y);
+	void record_button(int button, int action, int mods);
+	void record_move(double x, double y);
 };
