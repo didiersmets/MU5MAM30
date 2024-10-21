@@ -28,6 +28,7 @@ target_compile_options(test_fem PUBLIC -Wall -Wextra -ffast-math -march=native)
 add_executable(test_viewer
 	src/bin/test_viewer.cpp
 	src/common/chrono.cpp
+	src/common/logging.c
 	src/mesh/duplicate_verts.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
@@ -40,6 +41,9 @@ add_executable(test_viewer
 	src/viewer/mouse.cpp
 	src/viewer/trackball.cpp
 	src/viewer/shaders.cpp
+	src/fem/fem_matrix.cpp
+	src/fem/P1.cpp
+	src/linalg/conjugate_gradient.cpp
 )
 target_include_directories(test_viewer PRIVATE 
 	include/common 
