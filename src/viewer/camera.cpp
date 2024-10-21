@@ -29,7 +29,6 @@ Camera::Camera(float aspect_ratio, float fov, Fov axis)
 
 Camera &Camera::set_aspect(float aspect_ratio, const Fov cst_axis)
 {
-
 	assert(aspect_ratio > 0);
 
 	if (cst_axis == Horizontal) {
@@ -70,9 +69,18 @@ Camera &Camera::set_orthographic(bool is_ortho)
 	return (*this);
 }
 
-Vec3 Camera::get_position() const { return (position); }
-Quat Camera::get_rotation() const { return rotation; }
-Vec3 Camera::get_target() const { return target; }
+Vec3 Camera::get_position() const
+{
+	return (position);
+}
+Quat Camera::get_rotation() const
+{
+	return rotation;
+}
+Vec3 Camera::get_target() const
+{
+	return target;
+}
 
 Camera &Camera::set_position(const Vec3 &position)
 {
@@ -121,7 +129,7 @@ Camera &Camera::orbit(const Quat &r, Space coord)
 	if (coord == View) {
 		rot.xyz = ::rotate(rot.xyz, rotation);
 	}
-	rotation = compose(rotation, rot);
+	rotation = compose(rotation, rot).normalise();
 	position = ::orbit(position, rot, target);
 	return (*this);
 }
@@ -133,9 +141,15 @@ Camera &Camera::zoom(float factor)
 	return (*this);
 }
 
-float Camera::get_near() const { return frustum.near; }
+float Camera::get_near() const
+{
+	return frustum.near;
+}
 
-float Camera::get_far() const { return frustum.far; }
+float Camera::get_far() const
+{
+	return frustum.far;
+}
 
 Camera &Camera::set_near(float near_plane)
 {
@@ -149,9 +163,15 @@ Camera &Camera::set_far(float far_plane)
 	return (*this);
 }
 
-Mat4 Camera::view_to_clip() const { return projection_matrix(frustum); }
+Mat4 Camera::view_to_clip() const
+{
+	return projection_matrix(frustum);
+}
 
-Mat4 Camera::clip_to_view() const { return projection_matrix_inv(frustum); }
+Mat4 Camera::clip_to_view() const
+{
+	return projection_matrix_inv(frustum);
+}
 
 Mat4 Camera::world_to_view() const
 {
@@ -180,7 +200,7 @@ Ray Camera::view_ray_at(float x, float y) const
 	Vec3 ndc = nwd_to_ndc(x, y, 0.5f);
 	Vec3 v = transform(clip_to_view(), ndc);
 
-	return {.start = Vec3::Zero, .dir = v};
+	return { .start = Vec3::Zero, .dir = v };
 }
 
 Ray Camera::world_ray_at(float x, float y) const
@@ -190,7 +210,7 @@ Ray Camera::world_ray_at(float x, float y) const
 	Vec3 ndc = nwd_to_ndc(x, y, 0.5f);
 	Vec3 v = transform(clip_to_world(), ndc);
 
-	return {.start = position, .dir = v};
+	return { .start = position, .dir = v };
 }
 
 Vec3 Camera::view_coord_at(float x, float y, float depth) const
@@ -278,7 +298,6 @@ enum Visibility visibility(const Aabb &bbox, const float *pvm)
 	float T, W;
 
 	for (int i = 0; i < 8; ++i) {
-
 		float x = (i & 1) ? (bbox.min.x) : (bbox.max.x);
 		float y = (i & 2) ? (bbox.min.y) : (bbox.max.y);
 		float z = (i & 4) ? (bbox.min.z) : (bbox.max.z);

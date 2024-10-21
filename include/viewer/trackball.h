@@ -6,12 +6,10 @@
 struct ScreenTrackball {
 	/* Methods */
 	void grab(float px, float py, int width, int height);
-	Quat drag(float px, float py, int width, int height);
+	Quat drag(float px, float py, int width, int height, bool *needs_reset);
 	void release();
 	void set_sensitivity(float sensitivity);
 	/* Members */
-	bool grabbed = false;
-	Quat pre_rot;
 	Vec3 last_v;
 	float sensitivity = 1.f;
 };

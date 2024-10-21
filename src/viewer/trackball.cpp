@@ -7,18 +7,15 @@
 
 void ScreenTrackball::grab(float px, float py, int width, int height)
 {
-	// assert(!grabbed);
-	pre_rot = Quat::Identity;
 	last_v = screen_trackball(px, py, width, height);
-	grabbed = true;
 }
 
-Quat ScreenTrackball::drag(float px, float py, int width, int height)
+Quat ScreenTrackball::drag(float px, float py, int width, int height,
+			   bool *needs_reset)
 {
 	// assert(grabbed);
 	Vec3 v = screen_trackball(px, py, width, height);
 	Quat rot = great_circle_rotation(last_v, v);
-	rot = compose(pre_rot, rot);
 	/**
 	 * Great_circle_rotation is singular when from and to are
 	 * close to antipodal. To avoid that situation, we checkout
@@ -27,12 +24,10 @@ Quat ScreenTrackball::drag(float px, float py, int width, int height)
 	 */
 	if (dot(v, last_v) < 0) {
 		last_v = v;
-		pre_rot = compose(pre_rot, rot);
+		*needs_reset = true;
 	}
-	return pow(rot, sensitivity);
+	return pow(rot, sensitivity).normalise();
 }
-
-void ScreenTrackball::release() { grabbed = false; }
 
 void ScreenTrackball::set_sensitivity(float sensitivity)
 {
@@ -45,7 +40,7 @@ Vec3 screen_trackball(float px, float py, float width, float height)
 	float y = (height - 2 * py) / height;
 	float a = 2.f / (1.f + x * x + y * y);
 
-	Vec3 v{a * x, a * y, -1.f + a};
+	Vec3 v{ a * x, a * y, -1.f + a };
 
 	assert(approx_equal<float>(norm(v), 1.f));
 
