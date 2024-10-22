@@ -67,8 +67,11 @@ static size_t system_solve(const Mesh &m, const TArray<double> &f,
 
 	M.mvp(f.data, b.data);
 
+	double relative_error;
 	size_t iter = conjugate_gradient_solve(S, b.data, u.data, r.data,
-					       p.data, Ap.data, 1e-6, max_iter);
+					       p.data, Ap.data, &relative_error,
+					       1e-6, max_iter);
+
 	return (iter);
 }
 

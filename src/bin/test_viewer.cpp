@@ -2,7 +2,7 @@
 #include <string.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
+#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -26,12 +26,15 @@
 struct Cfg {
 	bool draw_surface = true;
 	bool draw_edges = true;
-	float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
+	float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
 	bool autoscale = true;
-	bool restart = false;
+	bool started = false;
+	bool one_step = false;
+	bool reset = false;
+	bool needs_redraw;
 	float scale_min;
 	float scale_max;
-	int iter_per_frame = 0;
+	int iter_per_frame = 1;
 
 } cfg;
 
@@ -54,15 +57,16 @@ struct FEMData {
 	size_t N;
 	TArray<double> f;
 	TArray<double> u;
-	FEMatrix A;	   // Matrix A of the system Au=Mf
-	FEMatrix M;	   // Mass matrix
-	TArray<double> b;  // rhs b = Mf of the system
-	TArray<double> r;  // current residue
-	TArray<double> p;  // internal for cg
+	FEMatrix A; // Matrix A of the system Au=Mf
+	FEMatrix M; // Mass matrix
+	TArray<double> b; // rhs b = Mf of the system
+	TArray<double> r; // current residue
+	TArray<double> p; // internal for cg
 	TArray<double> Ap; // internal for cg
 	size_t iterate = 0;
 	bool converged = false;
 	double relative_error = 0;
+
 	void clear_solution();
 	void construct_rhs();
 	size_t do_iterate(size_t max_iter);
@@ -70,7 +74,13 @@ struct FEMData {
 };
 
 FEMData::FEMData(const Mesh &m)
-    : N(m.vertex_count()), f(N), u(N, 0.0), b(N), r(N), p(N), Ap(N)
+	: N(m.vertex_count())
+	, f(N)
+	, u(N, 0.0)
+	, b(N)
+	, r(N)
+	, p(N)
+	, Ap(N)
 {
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, A);
@@ -86,12 +96,16 @@ void FEMData::clear_solution()
 	converged = false;
 }
 
-void FEMData::construct_rhs() { M.mvp(f.data, b.data); }
+void FEMData::construct_rhs()
+{
+	M.mvp(f.data, b.data);
+}
 
 size_t FEMData::do_iterate(size_t max_iter)
 {
 	size_t iter = conjugate_gradient_solve(A, b.data, u.data, r.data,
-					       p.data, Ap.data, 1e-6, max_iter);
+					       p.data, Ap.data, &relative_error,
+					       1e-6, max_iter, iterate != 0);
 	iterate += iter;
 	if (iter < max_iter) {
 		converged = true;
@@ -109,7 +123,6 @@ void FEMData::transfer_sol_to_mesh(Mesh &m)
 
 int main(int argc, char **argv)
 {
-
 	log_init(0);
 
 	/* Load Mesh */
@@ -131,7 +144,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({key_cb, &cfg});
+	viewer.register_key_callback({ key_cb, &cfg });
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -148,7 +161,6 @@ int main(int argc, char **argv)
 
 	/* Main Loop */
 	while (!viewer.should_close()) {
-
 		viewer.poll_events();
 		update_all(fem, mesh, gpu_mesh);
 		viewer.begin_frame();
@@ -204,9 +216,10 @@ static void fill_rhs(const Mesh &mesh, TArray<double> &f)
 	for (size_t i = 0; i < mesh.vertex_count(); ++i) {
 		float x = mesh.positions[i].x;
 		float y = mesh.positions[i].y;
-		// float z = mesh.positions[i].z;
-		f[i] =
-		    5 * pow(x, 4) * y - 10 * pow(x, 2) * pow(y, 3) + pow(y, 5);
+		float z = mesh.positions[i].z;
+		//f[i] = 5 * pow(x, 4) * y - 10 * pow(x, 2) * pow(y, 3) +
+		//       pow(y, 5);
+		f[i] = cos(31 * x) + cos(7 * y * y) - 4 * cos(17 * z);
 	}
 }
 
@@ -243,22 +256,27 @@ static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max)
 
 static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
 {
-	if (cfg.restart) {
-		fem.clear_solution();
-		cfg.restart = false;
-		return;
-	}
-	if (fem.converged) {
-		return;
-	}
-	size_t max_iter = cfg.iter_per_frame;
-	if (max_iter > 0) {
+	bool needs_upload = true;
+	if (cfg.started || cfg.one_step) {
 		fem.do_iterate(cfg.iter_per_frame);
-		fem.transfer_sol_to_mesh(mesh);
+		if (cfg.one_step) {
+			cfg.one_step = false;
+		}
+	} else if (cfg.reset) {
+		fem.clear_solution();
+		cfg.reset = false;
+	} else {
+		needs_upload = false;
+	}
+	if (needs_upload) {
 		if (cfg.autoscale) {
 			get_attr_bounds(mesh, &cfg.scale_min, &cfg.scale_max);
 		}
+		fem.transfer_sol_to_mesh(mesh);
 		gpu_mesh.update_attr();
+	}
+	if (fem.converged) {
+		cfg.started = false;
 	}
 }
 
@@ -306,11 +324,26 @@ static void draw_gui(FEMData &fem)
 	ImGui::Begin("Controls");
 
 	ImGui::Checkbox("Autoscale", &cfg.autoscale);
-	ImGui::DragInt("Iter per frame", &cfg.iter_per_frame);
-	if (ImGui::Button("Restart")) {
-		cfg.restart = true;
+	ImGui::DragInt("Iterations per step", &cfg.iter_per_frame, 1, 1, 10);
+	if (ImGui::Button("Start")) {
+		cfg.started = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Stop")) {
+		cfg.started = false;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("One step")) {
+		if (!cfg.started) {
+			cfg.one_step = true;
+		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Reset")) {
+		cfg.reset = true;
 	}
 	ImGui::Text("Iterate : %zu", fem.iterate);
+	ImGui::Text("Relative error : %g", fem.relative_error);
 	ImGui::Text("Number of DOF : %zu", fem.N);
 
 	float fps = ImGui::GetIO().Framerate;
