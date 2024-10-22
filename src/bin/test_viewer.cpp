@@ -8,6 +8,8 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
+#include "tiny_expr/tinyexpr.h"
+
 #include "P1.h"
 #include "chrono.h"
 #include "conjugate_gradient.h"
@@ -23,25 +25,30 @@
 #include "sphere.h"
 #include "viewer.h"
 
-struct Cfg {
-	bool draw_surface = true;
-	bool draw_edges = true;
-	float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
-	bool autoscale = true;
-	bool started = false;
-	bool one_step = false;
-	bool reset = false;
-	bool needs_redraw;
-	float scale_min;
-	float scale_max;
-	int iter_per_frame = 1;
+float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
+bool draw_surface = true;
+bool draw_edges = false;
 
-} cfg;
+bool autoscale = true;
+bool started = false;
+bool one_step = false;
+bool reset = false;
+float scale_min;
+float scale_max;
+int iter_per_frame = 1;
+
+/* RHS expression of the PDE */
+char rhs_expression[128] = "x^2 - y^2";
+bool rhs_show_error = false;
+double rhs_x, rhs_y, rhs_z;
+te_variable rhs_vars[3] = { { "x", &rhs_x }, { "y", &rhs_y }, { "z", &rhs_z } };
+te_expr *te_rhs = NULL;
 
 struct FEMData;
 
 static void syntax(char *prg_name);
 static int load_mesh(Mesh &mesh, int argc, char **argv);
+static void rescale_and_recenter_mesh(Mesh &mesh);
 static void init_camera_for_mesh(const Mesh &mesh, Camera &camera);
 static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &mesh_gpu);
 static void draw_scene(const Viewer &viewer, int shader,
@@ -50,10 +57,11 @@ static void draw_gui(FEMData &fem);
 static void key_cb(int key, int action, int mods, void *args);
 
 static void add_mass_to_stiffness(FEMatrix &S, const FEMatrix &M);
-static void fill_rhs(const Mesh &mesh, TArray<double> &f);
+static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
 struct FEMData {
 	FEMData(const Mesh &m);
+	const Mesh &m;
 	size_t N;
 	TArray<double> f;
 	TArray<double> u;
@@ -68,13 +76,15 @@ struct FEMData {
 	double relative_error = 0;
 
 	void clear_solution();
-	void construct_rhs();
+	bool construct_rhs();
 	size_t do_iterate(size_t max_iter);
+	void transfer_rhs_to_mesh(Mesh &m);
 	void transfer_sol_to_mesh(Mesh &m);
 };
 
 FEMData::FEMData(const Mesh &m)
-	: N(m.vertex_count())
+	: m(m)
+	, N(m.vertex_count())
 	, f(N)
 	, u(N, 0.0)
 	, b(N)
@@ -90,15 +100,27 @@ FEMData::FEMData(const Mesh &m)
 void FEMData::clear_solution()
 {
 	for (size_t i = 0; i < N; ++i) {
-		u[i] = 0.0;
+		u[i] = f[i];
 	}
 	iterate = 0;
 	converged = false;
 }
 
-void FEMData::construct_rhs()
+bool FEMData::construct_rhs()
 {
+	te_expr *test = te_compile(rhs_expression, rhs_vars, 3, NULL);
+	if (!test)
+		return false;
+	te_free(te_rhs);
+	te_rhs = test;
+	for (size_t i = 0; i < N; ++i) {
+		rhs_x = m.positions[i].x;
+		rhs_y = m.positions[i].y;
+		rhs_z = m.positions[i].z;
+		f[i] = te_eval(te_rhs);
+	}
 	M.mvp(f.data, b.data);
+	return true;
 }
 
 size_t FEMData::do_iterate(size_t max_iter)
@@ -111,6 +133,14 @@ size_t FEMData::do_iterate(size_t max_iter)
 		converged = true;
 	}
 	return iter;
+}
+
+void FEMData::transfer_rhs_to_mesh(Mesh &m)
+{
+	m.attr.resize(m.vertex_count());
+	for (size_t i = 0; i < m.vertex_count(); ++i) {
+		m.attr[i] = f[i];
+	}
 }
 
 void FEMData::transfer_sol_to_mesh(Mesh &m)
@@ -132,10 +162,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	LOG_MSG("Loaded mesh.");
+	rescale_and_recenter_mesh(mesh);
+	LOG_MSG("Mesh rescaled and recentered.");
 
 	/* Prepare FEM data */
 	FEMData fem(mesh);
-	fill_rhs(mesh, fem.f);
 	fem.construct_rhs();
 	fem.transfer_sol_to_mesh(mesh);
 	LOG_MSG("Prepared FEM data.");
@@ -144,7 +175,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({ key_cb, &cfg });
+	viewer.register_key_callback({ key_cb, NULL });
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -157,6 +188,8 @@ int main(int argc, char **argv)
 	LOG_MSG("Shader initialized.");
 	GPUMesh gpu_mesh;
 	gpu_mesh.m = &mesh;
+	fem.transfer_rhs_to_mesh(mesh);
+	get_attr_bounds(mesh, &scale_min, &scale_max);
 	gpu_mesh.upload();
 
 	/* Main Loop */
@@ -194,6 +227,22 @@ static int load_mesh(Mesh &mesh, int argc, char **argv)
 	return res;
 }
 
+static void rescale_and_recenter_mesh(Mesh &mesh)
+{
+	Aabb bbox = compute_mesh_bounds(mesh);
+	Vec3 model_center = (bbox.min + bbox.max) * 0.5f;
+	Vec3 model_extent = (bbox.max - bbox.min);
+	float model_size = max(model_extent);
+	if (model_size == 0) {
+		printf("Warning : Mesh is empty or reduced to a point.\n");
+		model_size = 1;
+	}
+	for (size_t i = 0; i < mesh.vertex_count(); ++i) {
+		mesh.positions[i] -= model_center;
+		mesh.positions[i] /= model_size;
+	}
+}
+
 static void init_camera_for_mesh(const Mesh &mesh, Camera &camera)
 {
 	Aabb bbox = compute_mesh_bounds(mesh);
@@ -209,18 +258,6 @@ static void init_camera_for_mesh(const Mesh &mesh, Camera &camera)
 	camera.set_position(start_pos);
 	camera.set_near(0.01 * model_size);
 	camera.set_far(100 * model_size);
-}
-
-static void fill_rhs(const Mesh &mesh, TArray<double> &f)
-{
-	for (size_t i = 0; i < mesh.vertex_count(); ++i) {
-		float x = mesh.positions[i].x;
-		float y = mesh.positions[i].y;
-		float z = mesh.positions[i].z;
-		//f[i] = 5 * pow(x, 4) * y - 10 * pow(x, 2) * pow(y, 3) +
-		//       pow(y, 5);
-		f[i] = cos(31 * x) + cos(7 * y * y) - 4 * cos(17 * z);
-	}
 }
 
 static void add_mass_to_stiffness(FEMatrix &S, const FEMatrix &M)
@@ -257,34 +294,37 @@ static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max)
 static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
 {
 	bool needs_upload = true;
-	if (cfg.started || cfg.one_step) {
-		fem.do_iterate(cfg.iter_per_frame);
-		if (cfg.one_step) {
-			cfg.one_step = false;
+	if (started || one_step) {
+		fem.do_iterate(iter_per_frame);
+		if (one_step) {
+			one_step = false;
 		}
-	} else if (cfg.reset) {
+		fem.transfer_sol_to_mesh(mesh);
+		if (autoscale) {
+			get_attr_bounds(mesh, &scale_min, &scale_max);
+		}
+	} else if (reset) {
 		fem.clear_solution();
-		cfg.reset = false;
+		fem.transfer_rhs_to_mesh(mesh);
+		if (autoscale) {
+			get_attr_bounds(mesh, &scale_min, &scale_max);
+		}
+		reset = false;
 	} else {
 		needs_upload = false;
 	}
 	if (needs_upload) {
-		if (cfg.autoscale) {
-			get_attr_bounds(mesh, &cfg.scale_min, &cfg.scale_max);
-		}
-		fem.transfer_sol_to_mesh(mesh);
 		gpu_mesh.update_attr();
 	}
 	if (fem.converged) {
-		cfg.started = false;
+		started = false;
 	}
 }
 
 static void draw_scene(const Viewer &viewer, int shader,
 		       const GPUMesh &gpu_mesh)
 {
-	glClearColor(cfg.bgcolor[0], cfg.bgcolor[1], cfg.bgcolor[2],
-		     cfg.bgcolor[3]);
+	glClearColor(bgcolor[0], bgcolor[1], bgcolor[2], bgcolor[3]);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
@@ -299,10 +339,10 @@ static void draw_scene(const Viewer &viewer, int shader,
 	glUniformMatrix4fv(0, 1, 0, &vm(0, 0));
 	glUniformMatrix4fv(1, 1, 0, &proj(0, 0));
 	glUniform3fv(2, 1, &camera_pos[0]);
-	glUniform1f(4, cfg.scale_min);
-	glUniform1f(5, cfg.scale_max);
+	glUniform1f(4, scale_min);
+	glUniform1f(5, scale_max);
 
-	if (cfg.draw_surface) {
+	if (draw_surface) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		float offset = reversed_z ? -1.f : 1.f;
 		glPolygonOffset(offset, offset);
@@ -310,7 +350,7 @@ static void draw_scene(const Viewer &viewer, int shader,
 		glUniform1i(3, true);
 		gpu_mesh.draw();
 	}
-	if (cfg.draw_edges) {
+	if (draw_edges) {
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(0.f, 0.f);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -322,25 +362,43 @@ static void draw_scene(const Viewer &viewer, int shader,
 static void draw_gui(FEMData &fem)
 {
 	ImGui::Begin("Controls");
+	ImGui::Text("Solves -\\Delta u + u = f");
+	ImGui::Text("------------------------");
 
-	ImGui::Checkbox("Autoscale", &cfg.autoscale);
-	ImGui::DragInt("Iterations per step", &cfg.iter_per_frame, 1, 1, 10);
+	ImGui::Text("Enter math expression for f below:");
+	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
+	ImGui::SameLine();
+	if (ImGui::Button("Apply")) {
+		if (!fem.construct_rhs()) {
+			rhs_show_error = true;
+		}
+	}
+	if (rhs_show_error) {
+		ImGui::Begin("Error");
+		if (ImGui::Button("ok")) {
+			//rhs_show_error = false;
+		}
+		ImGui::End();
+	}
+
+	ImGui::Checkbox("Autoscale", &autoscale);
+	ImGui::DragInt("Iterations per step", &iter_per_frame, 1, 1, 10);
 	if (ImGui::Button("Start")) {
-		cfg.started = true;
+		started = true;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Stop")) {
-		cfg.started = false;
+		started = false;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("One step")) {
-		if (!cfg.started) {
-			cfg.one_step = true;
+		if (!started) {
+			one_step = true;
 		}
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Reset")) {
-		cfg.reset = true;
+		reset = true;
 	}
 	ImGui::Text("Iterate : %zu", fem.iterate);
 	ImGui::Text("Relative error : %g", fem.relative_error);
@@ -354,13 +412,13 @@ static void draw_gui(FEMData &fem)
 static void key_cb(int key, int action, int mods, void *args)
 {
 	(void)mods;
-	Cfg *cfg = (Cfg *)args;
+	(void)args;
 	if (key == GLFW_KEY_S && action == GLFW_PRESS) {
-		cfg->draw_surface = !cfg->draw_surface;
+		draw_surface = !draw_surface;
 		return;
 	}
 	if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-		cfg->draw_edges = !cfg->draw_edges;
+		draw_edges = !draw_edges;
 		return;
 	}
 }

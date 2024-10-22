@@ -46,9 +46,6 @@ size_t conjugate_gradient_solve(const Matrix &A, const double *__restrict b,
 		/* beta_k = r_{k+1}^Tr_{k+1} / (r_k^T r_k) */
 		double beta = 1. / error2;
 		error2 = blas_dot(r, r, N);
-		// printf("Iteration %d : %g (%g)\r", iter, error2,
-		//        sqrt(error2 / normsqb));
-		// fflush(stdout);
 		beta *= error2;
 
 		/* p_{k+1} = r_{k+1} + beta_{k+1} p_k */

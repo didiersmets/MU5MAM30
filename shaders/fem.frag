@@ -7,8 +7,8 @@ layout (location = 2) in float u;
 
 /* Uniform variables (cell independent) */
 layout (location = 3) uniform bool lighting;
-layout (location = 4) uniform float scal_min;
-layout (location = 5) uniform float scal_max;
+layout (location = 4) uniform float scale_min;
+layout (location = 5) uniform float scale_max;
 
 // Out color
 layout (location = 0) out vec4 color;
@@ -20,10 +20,10 @@ layout (location = 0) out vec4 color;
 #define Ks 0.1f
 #define shininess 8
 
-vec3 color_from_val(float u, float scal_min, float scal_max)
+vec3 color_from_val(float u, float scale_min, float scale_max)
 {
 	vec3 color;
-	float l = (u - scal_min) / (scal_max - scal_min);
+	float l = (u - scale_min) / (scale_max - scale_min);
 	if (l < 0.5f) {
 		color = vec3(1 - 2.f * l, 2.f * l, 0.f);
 	} else {
@@ -54,8 +54,7 @@ void main()
 			float ca = max(dot(R, V), 0.f); 
 			Is = pow(ca, shininess) * shininess / 4;
 		}
-		vec3 base = color_from_val(u, scal_min, scal_max);
-		//vec3 base = vec3(1.f, 0.f, 0.f);
+		vec3 base = color_from_val(u, scale_min, scale_max);
 		vec3 full = Ka * base
 		          + Kd * Id * base
 		          + Ks * Is * SPECULAR_COLOR;

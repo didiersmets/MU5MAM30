@@ -53,8 +53,8 @@ target_include_directories(test_viewer PRIVATE
 	include/linalg
 	extern
 )
-target_compile_options(test_viewer PUBLIC -Wall -Wextra)
-target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL)
+target_compile_options(test_viewer PUBLIC -Wall -Wextra -Wno-missing-field-initializers)
+target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
 ###############################################################################
 
 ###############################################################################
@@ -65,6 +65,11 @@ add_library(imgui_glfw_opengl3
 	extern/imgui/imgui_widgets.cpp
 	extern/imgui/imgui_impl_glfw.cpp
 	extern/imgui/imgui_impl_opengl3.cpp
-	)
+)
 ###############################################################################
 
+###############################################################################
+add_library(tiny_expr
+	extern/tiny_expr/tinyexpr.c
+)
+###############################################################################
