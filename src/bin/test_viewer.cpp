@@ -3,7 +3,7 @@
 #include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -27,7 +27,7 @@
 #include "viewer.h"
 
 /* Viewer config */
-float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
+float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -43,13 +43,11 @@ int iter_per_frame = 1;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-	"cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
+    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
 bool rhs_show_error = false;
 double rhs_x, rhs_y, rhs_z, rhs_r;
-te_variable rhs_vars[] = { { "x", &rhs_x },
-			   { "y", &rhs_y },
-			   { "z", &rhs_z },
-			   { "rand", &rhs_r } };
+te_variable rhs_vars[] = {
+    {"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}, {"rand", &rhs_r}};
 te_expr *te_rhs = NULL;
 
 struct FEMData {
@@ -58,11 +56,11 @@ struct FEMData {
 	size_t dof;
 	TArray<double> f;
 	TArray<double> u;
-	FEMatrix A; // Matrix A of the system Au=Mf
-	FEMatrix M; // Mass matrix
-	TArray<double> b; // rhs b = Mf of the system
-	TArray<double> r; // current residue
-	TArray<double> p; // internal for cg
+	FEMatrix A;	   // Matrix A of the system Au=Mf
+	FEMatrix M;	   // Mass matrix
+	TArray<double> b;  // rhs b = Mf of the system
+	TArray<double> r;  // current residue
+	TArray<double> p;  // internal for cg
 	TArray<double> Ap; // internal for cg
 	size_t iterate = 0;
 	bool converged = false;
@@ -87,14 +85,8 @@ static void key_cb(int key, int action, int mods, void *args);
 static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
 FEMData::FEMData(const Mesh &m)
-	: m(m)
-	, dof(m.vertex_count())
-	, f(dof)
-	, u(dof, 0.0)
-	, b(dof)
-	, r(dof)
-	, p(dof)
-	, Ap(dof)
+    : m(m), dof(m.vertex_count()), f(dof), u(dof, 0.0), b(dof), r(dof), p(dof),
+      Ap(dof)
 {
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, A);
@@ -122,9 +114,9 @@ void FEMData::clear_solution()
 bool FEMData::construct_rhs()
 {
 	srand((int)time(NULL));
-	te_expr *test = te_compile(rhs_expression, rhs_vars,
-				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
-				   NULL);
+	te_expr *test =
+	    te_compile(rhs_expression, rhs_vars,
+		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
 	if (!test)
 		return false;
 	te_free(te_rhs);
@@ -133,7 +125,7 @@ bool FEMData::construct_rhs()
 		rhs_x = m.positions[i].x;
 		rhs_y = m.positions[i].y;
 		rhs_z = m.positions[i].z;
-		rhs_r = (float)rand() / RAND_MAX;
+		rhs_r = (double)rand() / RAND_MAX;
 		f[i] = te_eval(te_rhs);
 	}
 	M.mvp(f.data, b.data);
@@ -179,7 +171,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	LOG_MSG("Loaded mesh.");
-	//rescale_and_recenter_mesh(mesh);
+	rescale_and_recenter_mesh(mesh);
 	LOG_MSG("Mesh rescaled and recentered.");
 
 	/* Prepare FEM data */
@@ -193,7 +185,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({ key_cb, NULL });
+	viewer.register_key_callback({key_cb, NULL});
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -226,9 +218,9 @@ int main(int argc, char **argv)
 
 static void syntax(char *prg_name)
 {
-	printf("Syntax : %s ($(obj_filename)| cube | sphere) [n]", prg_name);
+	printf("Syntax : %s ($(obj_filename)| cube | sphere) [n]\n", prg_name);
 	printf("         Subdivision number n must be provided in case of "
-	       "         cube or sphere mesh.\n");
+	       "cube or sphere mesh.\n");
 }
 
 static int load_mesh(Mesh &mesh, int argc, char **argv)
@@ -368,8 +360,8 @@ static void draw_gui(FEMData &fem)
 	ImGui::Text("------------------------");
 
 	ImGui::Text("Enter math expression for f below:");
+	ImGui::Text("(available variables : x, y, z, rand)");
 	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
-	ImGui::SameLine();
 	if (ImGui::Button("Apply")) {
 		if (!fem.construct_rhs()) {
 			rhs_show_error = true;
@@ -379,16 +371,20 @@ static void draw_gui(FEMData &fem)
 	}
 	if (rhs_show_error) {
 		ImGui::Begin("Error");
-		if (ImGui::Button("ok")) {
+		ImGui::Text("Syntax error in expresion (missing * ?)");
+		if (ImGui::Button("Got it!")) {
 			rhs_show_error = false;
 		}
 		ImGui::End();
 	}
 
-	ImGui::Checkbox("Autoscale", &autoscale);
-	ImGui::Text("Low %.2f High %.2f  (Delta %g)", scale_min, scale_max,
-		    scale_max - scale_min);
-	ImGui::DragInt("Iterations per step", &iter_per_frame, 1, 1, 10);
+	ImGui::Text(" ");
+	ImGui::Text("Solution value is represented by color :");
+	ImGui::Text("Red = low value, Green = mid, Blue = high.");
+	ImGui::Text("Shows f at iter 0, then succive u_n iterates of cg.");
+
+	ImGui::Text(" ");
+
 	if (ImGui::Button("Start")) {
 		started = true;
 	}
@@ -406,13 +402,34 @@ static void draw_gui(FEMData &fem)
 	if (ImGui::Button("Reset")) {
 		reset = true;
 	}
+
+	ImGui::Text(" ");
 	ImGui::Text("Iterate : %zu", fem.iterate);
 	ImGui::Text("Relative error : %g", fem.relative_error);
-	ImGui::Text("Number of DOF : %zu", fem.dof);
-	ImGui::DragFloat("Deform", &mesh_deform, 0.01f, 0.f, 1.f);
+	ImGui::Text("Scale min %.2f Scale max %.2f  (Span : %g)", scale_min,
+		    scale_max, scale_max - scale_min);
 
+	ImGui::Text(" ");
+	ImGui::Text("Controls :");
+	ImGui::Checkbox("Autoscale", &autoscale);
+	ImGui::Checkbox("Show edges", &draw_edges);
+	ImGui::Text("Iterations per frame :");
+	ImGui::DragInt(" ", &iter_per_frame, 1, 1, 20);
+	ImGui::Text("Artificially deform mesh according to u :");
+	ImGui::Text("(may help visualize oscillations of u)");
+	ImGui::DragFloat("  ", &mesh_deform, 0.01f, 0.f, 1.f);
+
+	ImGui::Text(" ");
+	ImGui::Text("Number of DOF : %zu", fem.dof);
 	float fps = ImGui::GetIO().Framerate;
-	ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / fps, fps);
+	ImGui::Text("Average framerate : %.1f FPS", fps);
+
+	ImGui::Text(" ");
+	ImGui::Text("Mouse :");
+	ImGui::Text("Click + drag : orbit");
+	ImGui::Text("Click + CTRL + drag : zoom in/out");
+	ImGui::Text("Click + SHIFT + drag : translate");
+
 	ImGui::End();
 }
 

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include <GL/gl.h>
 #include <GL/glext.h>
@@ -80,20 +80,11 @@ void Viewer::init(const char *name)
 	ImGui_ImplOpenGL3_Init("#version 150");
 }
 
-void Viewer::register_key_callback(KeyCallback cb)
-{
-	key_callback = cb;
-}
+void Viewer::register_key_callback(KeyCallback cb) { key_callback = cb; }
 
-bool Viewer::should_close() const
-{
-	return glfwWindowShouldClose(window);
-}
+bool Viewer::should_close() const { return glfwWindowShouldClose(window); }
 
-void Viewer::poll_events()
-{
-	return glfwPollEvents();
-}
+void Viewer::poll_events() { return glfwPollEvents(); }
 
 void Viewer::begin_frame()
 {
@@ -170,7 +161,7 @@ static void mouse_button_cb(GLFWwindow *window, int button, int action,
 			return;
 		}
 		Vec3 target =
-			camera.world_coord_at(px / width, py / height, depth);
+		    camera.world_coord_at(px / width, py / height, depth);
 		camera.set_target(target);
 	}
 }
@@ -197,7 +188,7 @@ static void cursor_pos_cb(GLFWwindow *window, double x, double y)
 		/* Translation in x and y */
 		float dist = norm(camera.get_target() - camera.get_position());
 		float mult = dist / width;
-		Vec3 trans = { -delta_x * mult, delta_y * mult, 0.f };
+		Vec3 trans = {-delta_x * mult, delta_y * mult, 0.f};
 		camera.restore_spatial_state();
 		camera.translate(trans, Camera::View);
 	} else if (mods & GLFW_MOD_CONTROL) {
