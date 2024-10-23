@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
+#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -26,7 +27,7 @@
 #include "viewer.h"
 
 /* Viewer config */
-float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
+float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -42,23 +43,26 @@ int iter_per_frame = 1;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
+	"cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
 bool rhs_show_error = false;
-double rhs_x, rhs_y, rhs_z;
-te_variable rhs_vars[3] = {{"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}};
+double rhs_x, rhs_y, rhs_z, rhs_r;
+te_variable rhs_vars[] = { { "x", &rhs_x },
+			   { "y", &rhs_y },
+			   { "z", &rhs_z },
+			   { "rand", &rhs_r } };
 te_expr *te_rhs = NULL;
 
 struct FEMData {
 	FEMData(const Mesh &m);
 	const Mesh &m;
-	size_t N;
+	size_t dof;
 	TArray<double> f;
 	TArray<double> u;
-	FEMatrix A;	   // Matrix A of the system Au=Mf
-	FEMatrix M;	   // Mass matrix
-	TArray<double> b;  // rhs b = Mf of the system
-	TArray<double> r;  // current residue
-	TArray<double> p;  // internal for cg
+	FEMatrix A; // Matrix A of the system Au=Mf
+	FEMatrix M; // Mass matrix
+	TArray<double> b; // rhs b = Mf of the system
+	TArray<double> r; // current residue
+	TArray<double> p; // internal for cg
 	TArray<double> Ap; // internal for cg
 	size_t iterate = 0;
 	bool converged = false;
@@ -83,16 +87,23 @@ static void key_cb(int key, int action, int mods, void *args);
 static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
 FEMData::FEMData(const Mesh &m)
-    : m(m), N(m.vertex_count()), f(N), u(N, 0.0), b(N), r(N), p(N), Ap(N)
+	: m(m)
+	, dof(m.vertex_count())
+	, f(dof)
+	, u(dof, 0.0)
+	, b(dof)
+	, r(dof)
+	, p(dof)
+	, Ap(dof)
 {
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, A);
 
 	/* For -\Delta u + u we simply add the stiffness and mass matrices */
-	for (size_t i = 0; i < N; ++i) {
+	for (size_t i = 0; i < dof; ++i) {
 		A.diag[i] += M.diag[i];
 	}
-	for (size_t i = 0; i < N; ++i) {
+	for (size_t i = 0; i < m.triangle_count(); ++i) {
 		A.off_diag[3 * i + 0] += M.off_diag[i];
 		A.off_diag[3 * i + 1] += M.off_diag[i];
 		A.off_diag[3 * i + 2] += M.off_diag[i];
@@ -101,7 +112,7 @@ FEMData::FEMData(const Mesh &m)
 
 void FEMData::clear_solution()
 {
-	for (size_t i = 0; i < N; ++i) {
+	for (size_t i = 0; i < dof; ++i) {
 		u[i] = 0;
 	}
 	iterate = 0;
@@ -110,15 +121,19 @@ void FEMData::clear_solution()
 
 bool FEMData::construct_rhs()
 {
-	te_expr *test = te_compile(rhs_expression, rhs_vars, 3, NULL);
+	srand((int)time(NULL));
+	te_expr *test = te_compile(rhs_expression, rhs_vars,
+				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
+				   NULL);
 	if (!test)
 		return false;
 	te_free(te_rhs);
 	te_rhs = test;
-	for (size_t i = 0; i < N; ++i) {
+	for (size_t i = 0; i < dof; ++i) {
 		rhs_x = m.positions[i].x;
 		rhs_y = m.positions[i].y;
 		rhs_z = m.positions[i].z;
+		rhs_r = (float)rand() / RAND_MAX;
 		f[i] = te_eval(te_rhs);
 	}
 	M.mvp(f.data, b.data);
@@ -164,7 +179,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	LOG_MSG("Loaded mesh.");
-	rescale_and_recenter_mesh(mesh);
+	//rescale_and_recenter_mesh(mesh);
 	LOG_MSG("Mesh rescaled and recentered.");
 
 	/* Prepare FEM data */
@@ -178,7 +193,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({key_cb, NULL});
+	viewer.register_key_callback({ key_cb, NULL });
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -365,7 +380,7 @@ static void draw_gui(FEMData &fem)
 	if (rhs_show_error) {
 		ImGui::Begin("Error");
 		if (ImGui::Button("ok")) {
-			// rhs_show_error = false;
+			rhs_show_error = false;
 		}
 		ImGui::End();
 	}
@@ -393,7 +408,7 @@ static void draw_gui(FEMData &fem)
 	}
 	ImGui::Text("Iterate : %zu", fem.iterate);
 	ImGui::Text("Relative error : %g", fem.relative_error);
-	ImGui::Text("Number of DOF : %zu", fem.N);
+	ImGui::Text("Number of DOF : %zu", fem.dof);
 	ImGui::DragFloat("Deform", &mesh_deform, 0.01f, 0.f, 1.f);
 
 	float fps = ImGui::GetIO().Framerate;
