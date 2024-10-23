@@ -4,7 +4,7 @@
 
 #include "mouse.h"
 
-#define DOUBLE_CLICK_TIME 0.5 /* in seconds           */
+#define DOUBLE_CLICK_TIME 0.3 /* in seconds           */
 
 void Mouse::record_button(int button, int action, int mods)
 {

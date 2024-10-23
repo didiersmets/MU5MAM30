@@ -2,7 +2,7 @@
 #include <string.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -25,39 +25,28 @@
 #include "sphere.h"
 #include "viewer.h"
 
-float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
+/* Viewer config */
+float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
 bool draw_surface = true;
 bool draw_edges = false;
+float scale_min;
+float scale_max;
+float mesh_deform = 0;
 
+/* FEM interaction */
 bool autoscale = true;
 bool started = false;
 bool one_step = false;
 bool reset = false;
-float scale_min;
-float scale_max;
 int iter_per_frame = 1;
 
 /* RHS expression of the PDE */
-char rhs_expression[128] = "x^2 - y^2";
+char rhs_expression[128] =
+    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
 bool rhs_show_error = false;
 double rhs_x, rhs_y, rhs_z;
-te_variable rhs_vars[3] = { { "x", &rhs_x }, { "y", &rhs_y }, { "z", &rhs_z } };
+te_variable rhs_vars[3] = {{"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}};
 te_expr *te_rhs = NULL;
-
-struct FEMData;
-
-static void syntax(char *prg_name);
-static int load_mesh(Mesh &mesh, int argc, char **argv);
-static void rescale_and_recenter_mesh(Mesh &mesh);
-static void init_camera_for_mesh(const Mesh &mesh, Camera &camera);
-static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &mesh_gpu);
-static void draw_scene(const Viewer &viewer, int shader,
-		       const GPUMesh &gpu_mesh);
-static void draw_gui(FEMData &fem);
-static void key_cb(int key, int action, int mods, void *args);
-
-static void add_mass_to_stiffness(FEMatrix &S, const FEMatrix &M);
-static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
 struct FEMData {
 	FEMData(const Mesh &m);
@@ -65,11 +54,11 @@ struct FEMData {
 	size_t N;
 	TArray<double> f;
 	TArray<double> u;
-	FEMatrix A; // Matrix A of the system Au=Mf
-	FEMatrix M; // Mass matrix
-	TArray<double> b; // rhs b = Mf of the system
-	TArray<double> r; // current residue
-	TArray<double> p; // internal for cg
+	FEMatrix A;	   // Matrix A of the system Au=Mf
+	FEMatrix M;	   // Mass matrix
+	TArray<double> b;  // rhs b = Mf of the system
+	TArray<double> r;  // current residue
+	TArray<double> p;  // internal for cg
 	TArray<double> Ap; // internal for cg
 	size_t iterate = 0;
 	bool converged = false;
@@ -82,25 +71,38 @@ struct FEMData {
 	void transfer_sol_to_mesh(Mesh &m);
 };
 
+static void syntax(char *prg_name);
+static int load_mesh(Mesh &mesh, int argc, char **argv);
+static void rescale_and_recenter_mesh(Mesh &mesh);
+static void init_camera_for_mesh(const Mesh &mesh, Camera &camera);
+static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &mesh_gpu);
+static void draw_scene(const Viewer &viewer, int shader,
+		       const GPUMesh &gpu_mesh);
+static void draw_gui(FEMData &fem);
+static void key_cb(int key, int action, int mods, void *args);
+static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
+
 FEMData::FEMData(const Mesh &m)
-	: m(m)
-	, N(m.vertex_count())
-	, f(N)
-	, u(N, 0.0)
-	, b(N)
-	, r(N)
-	, p(N)
-	, Ap(N)
+    : m(m), N(m.vertex_count()), f(N), u(N, 0.0), b(N), r(N), p(N), Ap(N)
 {
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, A);
-	add_mass_to_stiffness(A, M);
+
+	/* For -\Delta u + u we simply add the stiffness and mass matrices */
+	for (size_t i = 0; i < N; ++i) {
+		A.diag[i] += M.diag[i];
+	}
+	for (size_t i = 0; i < N; ++i) {
+		A.off_diag[3 * i + 0] += M.off_diag[i];
+		A.off_diag[3 * i + 1] += M.off_diag[i];
+		A.off_diag[3 * i + 2] += M.off_diag[i];
+	}
 }
 
 void FEMData::clear_solution()
 {
 	for (size_t i = 0; i < N; ++i) {
-		u[i] = f[i];
+		u[i] = 0;
 	}
 	iterate = 0;
 	converged = false;
@@ -168,14 +170,15 @@ int main(int argc, char **argv)
 	/* Prepare FEM data */
 	FEMData fem(mesh);
 	fem.construct_rhs();
-	fem.transfer_sol_to_mesh(mesh);
+	fem.transfer_rhs_to_mesh(mesh);
+	get_attr_bounds(mesh, &scale_min, &scale_max);
 	LOG_MSG("Prepared FEM data.");
 
 	/* Get an OpenGL context through a viewer app. */
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({ key_cb, NULL });
+	viewer.register_key_callback({key_cb, NULL});
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -188,8 +191,6 @@ int main(int argc, char **argv)
 	LOG_MSG("Shader initialized.");
 	GPUMesh gpu_mesh;
 	gpu_mesh.m = &mesh;
-	fem.transfer_rhs_to_mesh(mesh);
-	get_attr_bounds(mesh, &scale_min, &scale_max);
 	gpu_mesh.upload();
 
 	/* Main Loop */
@@ -203,6 +204,7 @@ int main(int argc, char **argv)
 	}
 
 	viewer.fini();
+	log_fini();
 
 	return (EXIT_SUCCESS);
 }
@@ -260,20 +262,6 @@ static void init_camera_for_mesh(const Mesh &mesh, Camera &camera)
 	camera.set_far(100 * model_size);
 }
 
-static void add_mass_to_stiffness(FEMatrix &S, const FEMatrix &M)
-{
-	const Mesh *m = S.m;
-
-	for (size_t i = 0; i < m->vertex_count(); ++i) {
-		S.diag[i] += M.diag[i];
-	}
-	for (size_t i = 0; i < m->triangle_count(); ++i) {
-		S.off_diag[3 * i + 0] += M.off_diag[i];
-		S.off_diag[3 * i + 1] += M.off_diag[i];
-		S.off_diag[3 * i + 2] += M.off_diag[i];
-	}
-}
-
 static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max)
 {
 	if (!m.vertex_count())
@@ -306,9 +294,7 @@ static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
 	} else if (reset) {
 		fem.clear_solution();
 		fem.transfer_rhs_to_mesh(mesh);
-		if (autoscale) {
-			get_attr_bounds(mesh, &scale_min, &scale_max);
-		}
+		get_attr_bounds(mesh, &scale_min, &scale_max);
 		reset = false;
 	} else {
 		needs_upload = false;
@@ -341,6 +327,7 @@ static void draw_scene(const Viewer &viewer, int shader,
 	glUniform3fv(2, 1, &camera_pos[0]);
 	glUniform1f(4, scale_min);
 	glUniform1f(5, scale_max);
+	glUniform1f(6, mesh_deform);
 
 	if (draw_surface) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
@@ -372,16 +359,20 @@ static void draw_gui(FEMData &fem)
 		if (!fem.construct_rhs()) {
 			rhs_show_error = true;
 		}
+		started = false;
+		reset = true;
 	}
 	if (rhs_show_error) {
 		ImGui::Begin("Error");
 		if (ImGui::Button("ok")) {
-			//rhs_show_error = false;
+			// rhs_show_error = false;
 		}
 		ImGui::End();
 	}
 
 	ImGui::Checkbox("Autoscale", &autoscale);
+	ImGui::Text("Low %.2f High %.2f  (Delta %g)", scale_min, scale_max,
+		    scale_max - scale_min);
 	ImGui::DragInt("Iterations per step", &iter_per_frame, 1, 1, 10);
 	if (ImGui::Button("Start")) {
 		started = true;
@@ -403,6 +394,7 @@ static void draw_gui(FEMData &fem)
 	ImGui::Text("Iterate : %zu", fem.iterate);
 	ImGui::Text("Relative error : %g", fem.relative_error);
 	ImGui::Text("Number of DOF : %zu", fem.N);
+	ImGui::DragFloat("Deform", &mesh_deform, 0.01f, 0.f, 1.f);
 
 	float fps = ImGui::GetIO().Framerate;
 	ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / fps, fps);

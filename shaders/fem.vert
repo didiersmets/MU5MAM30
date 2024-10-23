@@ -10,6 +10,7 @@ layout (location = 1) uniform mat4 proj;
 layout (location = 2) uniform vec3 camera_pos;
 layout (location = 4) uniform float scale_min;
 layout (location = 5) uniform float scale_max;
+layout (location = 6) uniform float deform;
 
 /* Out variables */
 layout (location = 0) out vec3 V;    /* View vector in world space  */
@@ -19,7 +20,7 @@ layout (location = 2) out float u;   /* Value of the solution */
 void main() 
 {
 	u = attr_;
-	vec3 pos = pos_ * (1.f + .0f * (u - scale_min) / (scale_max - scale_min));
+	vec3 pos = pos_ * (1.f + deform * (u - scale_min) / (scale_max - scale_min));
 	
 	V = camera_pos - pos;
 	
