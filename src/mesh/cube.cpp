@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "cube.h"
+#include "duplicate_verts.h"
 #include "logging.h"
 #include "math_utils.h"
 #include "mesh.h"
@@ -81,7 +82,7 @@ int load_cube(Mesh &m, size_t subdiv)
 	load_cube_indices(m.indices.data, subdiv);
 
 	/* Finally attach faces between themselves */
-	/* TODO */
+	remove_duplicate_vertices(m);
 
 	return (0);
 }

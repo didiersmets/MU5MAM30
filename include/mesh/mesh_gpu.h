@@ -12,7 +12,9 @@ struct GPUMesh {
 	const Mesh *m;
 	GLuint pos_vbo;
 	GLuint idx_vbo;
+	GLuint attr_vbo;
 	GLuint vao;
 	void upload();
-	void draw();
+	void update_attr();
+	void draw() const;
 };

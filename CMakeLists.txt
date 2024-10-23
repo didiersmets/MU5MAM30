@@ -8,6 +8,7 @@ add_subdirectory(extern/glfw)
 add_executable(test_fem 
 	src/bin/test_fem.cpp
 	src/common/chrono.cpp
+	src/mesh/duplicate_verts.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
 	src/mesh/mesh_io.cpp
@@ -22,25 +23,29 @@ target_include_directories(test_fem PRIVATE
 	include/linalg
 	extern
 )
-target_compile_options(test_fem PUBLIC -Wall -Wextra)
+target_compile_options(test_fem PUBLIC -Wall -Wextra -ffast-math -march=native)
 ###############################################################################
 
 ###############################################################################
 add_executable(test_viewer
 	src/bin/test_viewer.cpp
 	src/common/chrono.cpp
+	src/common/logging.c
+	src/mesh/duplicate_verts.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
 	src/mesh/mesh_bounds.cpp
 	src/mesh/mesh_gpu.cpp
 	src/mesh/mesh_io.cpp
-	src/viewer/gui_app.cpp
-	src/viewer/viewer_app.cpp
+	src/viewer/viewer.cpp
 	src/viewer/camera.cpp
 	src/viewer/frustum.cpp
 	src/viewer/mouse.cpp
 	src/viewer/trackball.cpp
 	src/viewer/shaders.cpp
+	src/fem/fem_matrix.cpp
+	src/fem/P1.cpp
+	src/linalg/conjugate_gradient.cpp
 )
 target_include_directories(test_viewer PRIVATE 
 	include/common 
@@ -51,8 +56,8 @@ target_include_directories(test_viewer PRIVATE
 	extern
 	extern/glfw/include
 )
-target_compile_options(test_viewer PUBLIC -Wall -Wextra)
-target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL)
+target_compile_options(test_viewer PUBLIC -Wall -Wextra -Wno-missing-field-initializers)
+target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
 ###############################################################################
 
 ###############################################################################
@@ -67,3 +72,8 @@ add_library(imgui_glfw_opengl3
 target_include_directories(imgui_glfw_opengl3 PRIVATE extern/glfw/include)
 ###############################################################################
 
+###############################################################################
+add_library(tiny_expr
+	extern/tiny_expr/tinyexpr.c
+)
+###############################################################################

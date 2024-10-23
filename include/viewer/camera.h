@@ -11,7 +11,7 @@
 enum Visibility { None = 0, Partial = 1, Full = 2 };
 
 struct Camera {
-    public:
+      public:
 	enum Fov { Horizontal = 0, Vertical = 1 };
 	enum Space { View = 0, World = 1 };
 
@@ -84,29 +84,37 @@ struct Camera {
 	 */
 	Vec3 get_position() const;
 	Quat get_rotation() const;
+	Vec3 get_target() const;
 	Camera &set_position(const Vec3 &position);
 	Camera &set_rotation(const Quat &rotation);
+	Camera &set_target(const Vec3 &target);
 
 	/**
 	 * Apply a translation to the camera.
 	 *
-	 * @param t - Vector of translation.
+	 * @param t     - Vector of translation.
 	 * @param coord - Coordinate frame in which t is understood.
 	 */
 	Camera &translate(const Vec3 &t, Space coord = View);
 
 	/* Apply a rotation to the camera around its center.
 	 *
-	 * @param delta_rot {Quat} - Additional rotation wrt present.
+	 * @param r     - Additional rotation wrt present.
+	 * @param coord - Coordinate frame in which r is understood.
 	 */
-	Camera &rotate(const Quat &r);
+	Camera &rotate(const Quat &r, Space coord = View);
 
-	/* Roto translate the camera around some pivot point.
+	/* Roto translate the camera around its target point.
 	 *
-	 * @param r {Quat} - Additional rotation wrt present.
-	 * @param pivot - Pivot point in world coordinates.
+	 * @param r     - Additional rotation wrt present.
+	 * @param coord - Coordinate frame in which r is understood.
 	 */
-	Camera &orbit(const Quat &r, const Vec3 &pivot);
+	Camera &orbit(const Quat &r, Space coord = View);
+
+	/* Get closer to (resp. further from) the target, by multiplying the
+	 * distance between the camera and the target by 1/factor.
+	 */
+	Camera &zoom(float factor);
 
 	/**
 	 * Get and set near and far clip distances for rendering.
@@ -156,13 +164,22 @@ struct Camera {
 	Vec3 view_coord_at(float x, float y, float depth) const;
 	Vec3 world_coord_at(float x, float y, float depth) const;
 
-    private:
+	/* Save / restore current position and rotation */
+	void save_spatial_state();
+	void restore_spatial_state();
+
+      private:
 	/* Space configuration */
 	Quat rotation = Quat::Identity;
 	Vec3 position = Vec3::Zero;
+	Quat saved_rotation;
+	Vec3 saved_position;
 
 	/* Optical configuration */
 	CameraFrustum frustum;
+
+	/* Tracking point */
+	Vec3 target = Vec3::Zero;
 };
 
 int is_visible(const float *vtx, int n, const float *pvm);

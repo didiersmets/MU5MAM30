@@ -18,7 +18,12 @@ void syntax(char *prg_name)
 	exit(EXIT_FAILURE);
 }
 
-static double test_f(Vec3 pos) { return pos[0]; }
+static double test_f(Vec3 pos)
+{
+	float x = pos[0];
+	float y = pos[1];
+	return (5 * pow(x, 4) * y - 10 * pow(x, 2) * pow(y, 3) + pow(y, 5));
+}
 
 static void fill_rhs(const Mesh &mesh, TArray<double> &f)
 {
@@ -62,8 +67,11 @@ static size_t system_solve(const Mesh &m, const TArray<double> &f,
 
 	M.mvp(f.data, b.data);
 
+	double relative_error;
 	size_t iter = conjugate_gradient_solve(S, b.data, u.data, r.data,
-					       p.data, Ap.data, 1e-6, max_iter);
+					       p.data, Ap.data, &relative_error,
+					       1e-6, max_iter);
+
 	return (iter);
 }
 

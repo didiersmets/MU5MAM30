@@ -4,9 +4,9 @@
 
 #include "mouse.h"
 
-#define DOUBLE_CLICK_TIME 0.5 /* in seconds           */
+#define DOUBLE_CLICK_TIME 0.3 /* in seconds           */
 
-void Mouse::button(int button, int action, int mods)
+void Mouse::record_button(int button, int action, int mods)
 {
 	if (action == GLFW_PRESS) {
 		assert(button >= 0 && button < 3);
@@ -24,7 +24,7 @@ void Mouse::button(int button, int action, int mods)
 	}
 }
 
-void Mouse::move(double x, double y)
+void Mouse::record_move(double x, double y)
 {
 	this->x = x;
 	this->y = y;
