@@ -1,0 +1,13 @@
+prefix=/mnt/e/MU5MAM30/glfw_3.4
+exec_prefix=${prefix}
+includedir=/mnt/e/MU5MAM30/glfw_3.4/include
+libdir=/mnt/e/MU5MAM30/glfw_3.4/lib
+
+Name: GLFW
+Description: A multi-platform library for OpenGL, window and input
+Version: 3.5.0
+URL: https://www.glfw.org/
+Requires.private: 
+Libs: -L${libdir} -lglfw3
+Libs.private:  -lrt -lm -ldl
+Cflags: -I${includedir}

@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.14)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(MU5MAM30)
 
+set(GLFW_INSTALL_DIR "./glfw_3.4")
+list(APPEND CMAKE_PREFIX_PATH "${GLFW_INSTALL_DIR}")
+find_package(glfw3 REQUIRED)
+
 ###############################################################################
 add_executable(test_fem 
 	src/bin/test_fem.cpp
@@ -40,6 +44,8 @@ add_executable(test_viewer
 	src/viewer/trackball.cpp
 	src/viewer/shaders.cpp
 )
+
+
 target_include_directories(test_viewer PRIVATE 
 	include/common 
 	include/mesh 
@@ -47,8 +53,10 @@ target_include_directories(test_viewer PRIVATE
 	include/fem
 	include/linalg
 	extern
+	${GLFW_INCLUDE_DIRS}
 )
-target_compile_options(test_viewer PUBLIC -Wall -Wextra)
+
+
 target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL)
 ###############################################################################
 
@@ -60,6 +68,10 @@ add_library(imgui_glfw_opengl3
 	extern/imgui/imgui_widgets.cpp
 	extern/imgui/imgui_impl_glfw.cpp
 	extern/imgui/imgui_impl_opengl3.cpp
-	)
+)
+
+
+target_include_directories(imgui_glfw_opengl3 PRIVATE ${GLFW_INCLUDE_DIRS})
+target_link_libraries(imgui_glfw_opengl3 PRIVATE glfw)
 ###############################################################################
 
