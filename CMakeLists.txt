@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(MU5MAM30)
 
+add_subdirectory(extern/glfw)
+
 ###############################################################################
 add_executable(test_fem 
 	src/bin/test_fem.cpp
@@ -47,6 +49,7 @@ target_include_directories(test_viewer PRIVATE
 	include/fem
 	include/linalg
 	extern
+	extern/glfw/include
 )
 target_compile_options(test_viewer PUBLIC -Wall -Wextra)
 target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL)
@@ -61,5 +64,6 @@ add_library(imgui_glfw_opengl3
 	extern/imgui/imgui_impl_glfw.cpp
 	extern/imgui/imgui_impl_opengl3.cpp
 	)
+target_include_directories(imgui_glfw_opengl3 PRIVATE extern/glfw/include)
 ###############################################################################
 
