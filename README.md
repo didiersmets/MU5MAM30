@@ -4,3 +4,5 @@ Tutorial classes on Friday 2pm to 5pm in 16-26 401
 To get write permission access to this repo, first clone it using the _token_ that 
 will be given to you in the first lecture. All of you work shall be uploaded into
 the Students/Your_name directory.
+
+![test_viewer](./data/test_viewer.jpg?raw=true "Test FEM viewer")
