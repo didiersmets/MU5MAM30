@@ -335,14 +335,63 @@ int build_cube_vertices(struct Vertex *vert, int N){
 }
 
 int build_cube_triangles(struct Triangle *tri, int N){
-    (void) tri;
-    (void) N;
-    return 0;
+    int V = N + 1;
+	int t = 0;
+	for (int face = 0; face < 6; face++) {
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				int v = face * V * V + i * V + j;
+				tri[t++] = {v, v + 1, v + 1 + V};
+				tri[t++] = {v, v + 1 + V, v + V};
+			}
+		}
+	}
+	return t;
 }
 
+
+
 int dedup_mesh_vertices(struct Mesh *m){
-	(void) m;
-	return 0;
+	int count = 0;
+	int N = m->vtx_count;
+	int V = sqrt(N/6);
+	int NF = V * V;
+	int *change = (int *)malloc(N * sizeof(int));
+	for (int i = 0; i < N; i++){
+		if((abs(m->vertices[i].x) == 1 && abs(m->vertices[i].y) == 1) || 
+		   (abs(m->vertices[i].x) == 1 && abs(m->vertices[i].z) == 1) || 
+		   (abs(m->vertices[i].y) == 1 && abs(m->vertices[i].z) == 1)){
+			if((i >= 2*NF && i < 2*NF + V) || (i >= 2*NF + (V-1)*V && i < 3*NF) ||
+			   (i >= 3*NF && i < 3*NF + V) || (i >= 3*NF + (V-1)*V && i < 4*NF) ||
+			   i >= 4*NF){
+				change[i] = count;
+			   }
+			   else{
+				   change[i] = count;
+				   count++;
+			   }
+		}
+		else{
+			change[i] = count;
+			count++;
+		}
+	}
+
+	for(int i = 0; i < N; i++){
+		m->vertices[change[i]] = m->vertices[i];
+	}
+
+	for(int i = 0; i < m->tri_count; i++){
+		struct Triangle *T = &m->triangles[i];
+		T->a = change[T->a];
+		T->b = change[T->b];
+		T->c = change[T->c];
+	}
+
+	free(change);
+
+	return count;
+	
 }
 
 void build_cube_mesh(struct Mesh *m, int N)
@@ -370,12 +419,13 @@ void build_cube_mesh(struct Mesh *m, int N)
 	assert(m->vtx_count == 6 * V * V - 12 * V + 8);
 
 	/* Rescale to unit cube centered at the origin */
-	for (int i = 0; i < m->vtx_count; ++i) {
+
+	/*for (int i = 0; i < m->vtx_count; ++i) {
 		struct Vertex *v = &m->vertices[i];
 		v->x = 2 * v->x / N - 1;
 		v->y = 2 * v->y / N - 1;
 		v->z = 2 * v->z / N - 1;
-	}
+	}*/
 }
 
 /******************************************************************************
@@ -383,7 +433,12 @@ void build_cube_mesh(struct Mesh *m, int N)
  * the cube mesh so that they end up in S^2
  *****************************************************************************/
 void send_cube_to_sphere(struct Vertex *vert, int vtx_count){
-    (void) vert;
-    (void) vtx_count;
+    for (int i = 0; i < vtx_count; i++) {
+		struct Vertex *v = &vert[i];
+		double norm = sqrt(v->x * v->x + v->y * v->y + v->z * v->z);
+		v->x /= norm;
+		v->y /= norm;
+		v->z /= norm;
+	}
 }
 /*****************************************************************************/
