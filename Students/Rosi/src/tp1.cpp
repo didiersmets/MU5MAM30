@@ -141,28 +141,30 @@ void build_fem_matrices(const struct Mesh *m, struct SparseMatrix *S,
 
         double area = 0.5 * norm(cross(AB, CA));
         
-        struct Coeff * mass = &M->coeffs[9*t];
-        mass[0] = {a, a, area/6};
-        mass[1] = {b, b, area/6};
-        mass[2] = {c, c, area/6};
-        mass[3] = {a, b, area/12};
-        mass[4] = {a, c, area/12};
-        mass[5] = {b, a, area/12};
-        mass[6] = {c, a, area/12};
-        mass[7] = {c, b, area/12};
-        mass[8] = {b, c, area/12};
+        struct Coeff * mass = &M->coeffs[9 * t];
+
+        mass[0] = (Coeff) {a, a, area/6};
+        mass[1] = (Coeff) {b, b, area/6};
+        mass[2] = (Coeff) {c, c, area/6};
+        mass[3] = (Coeff) {a, b, area/12};
+        mass[4] = (Coeff) {a, c, area/12};
+        mass[5] = (Coeff) {b, a, area/12};
+        mass[6] = (Coeff) {c, a, area/12};
+        mass[7] = (Coeff) {c, b, area/12};
+        mass[8] = (Coeff) {b, c, area/12};
 
         struct Coeff * stiff = &S->coeffs[9*t];
         double mult = 1. / (4*area);
-        stiff[0] = {a,a,dot(BC,BC) * mult};
-        stiff[1] = {b,b,dot(CA,CA) * mult};
-        stiff[2] = {c,c,dot(AB,AB) * mult};
-		stiff[3] = {a,b,dot(BC,BC) * mult};
-        stiff[4] = {b,a,dot(CA,BC) * mult};
-        stiff[5] = {a,c,dot(CA,BC) * mult};
-        stiff[6] = {c,a,dot(AB,BC) * mult};
-        stiff[7] = {b,c,dot(AB,CA) * mult};
-        stiff[8] = {c,b,dot(AB,CA) * mult};
+
+        stiff[0] = (Coeff) {a,a,dot(BC,BC) * mult};
+        stiff[1] = (Coeff) {b,b,dot(CA,CA) * mult};
+        stiff[2] = (Coeff) {c,c,dot(AB,AB) * mult};
+		stiff[3] = (Coeff) {a,b,dot(BC,BC) * mult};
+        stiff[4] = (Coeff) {b,a,dot(CA,BC) * mult};
+        stiff[5] = (Coeff) {a,c,dot(CA,BC) * mult};
+        stiff[6] = (Coeff) {c,a,dot(AB,BC) * mult};
+        stiff[7] = (Coeff) {b,c,dot(AB,CA) * mult};
+        stiff[8] = (Coeff) {c,b,dot(AB,CA) * mult};
 	}
 	return;
 }
@@ -310,9 +312,26 @@ int main(int argc, char **argv)
  * Building a cube surface mesh. N is the number of subdivisions per side.
  * ***************************************************************************/
 int build_cube_vertices(struct Vertex *vert, int N){
-    (void) vert;
-    (void) N;
-    return 0;
+    int V = N + 1;
+	assert(V > 0);
+	int NF = V * V; // Number of vertices per face
+	double mult = 2. / (V - 1);
+	int k = 0;
+
+	for (int i = 0; i < V; i++) {
+		for (int j = 0; j < V; j++) {
+
+			vert[0*NF + k] = {-1,-1 + i*mult,-1 + j*mult};
+			vert[1*NF + k] = {1, -1 + i*mult,-1 + j*mult};
+			vert[2*NF + k] = {-1 + i*mult, -1,-1 + j*mult};
+			vert[3*NF + k] = {-1 + i*mult, 1 , -1 + j*mult};
+			vert[4*NF + k] = {-1 + i*mult,-1 + j*mult , -1};
+			vert[5*NF + k] = {-1 + i*mult, -1 + j*mult, 1};
+
+			k++;
+		}
+	}
+	return 6 * NF;
 }
 
 int build_cube_triangles(struct Triangle *tri, int N){
