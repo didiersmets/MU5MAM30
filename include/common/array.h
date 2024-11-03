@@ -84,7 +84,7 @@ template <typename T> inline const T &TArray<T>::operator[](size_t i) const
 template <typename T> inline void TArray<T>::push_back(const T &t)
 {
 	if (size >= capacity) {
-		capacity = capacity ? 1 : 2 * capacity;
+		capacity = capacity ? 2 * capacity : 1;
 		data = static_cast<T *>(
 			safe_realloc(data, capacity * sizeof(T)));
 	}
