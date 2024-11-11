@@ -3,7 +3,7 @@
 #include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -11,25 +11,21 @@
 
 #include "tiny_expr/tinyexpr.h"
 
-#include "P1.h"
 #include "chrono.h"
-#include "conjugate_gradient.h"
 #include "cube.h"
-#include "fem_matrix.h"
 #include "logging.h"
 #include "mesh.h"
 #include "mesh_bounds.h"
 #include "mesh_gpu.h"
 #include "mesh_io.h"
 #include "ndc.h"
+#include "poisson.h"
 #include "shaders.h"
 #include "sphere.h"
 #include "viewer.h"
-#include "euler2D.h"
-#include "tiny_blas.h"
 
 /* Viewer config */
-float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
+float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -45,138 +41,54 @@ int iter_per_frame = 1;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-	"cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
+    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
 bool rhs_show_error = false;
 double rhs_x, rhs_y, rhs_z, rhs_r;
-te_variable rhs_vars[] = { { "x", &rhs_x },
-			   { "y", &rhs_y },
-			   { "z", &rhs_z },
-			   { "rand", &rhs_r } };
+te_variable rhs_vars[] = {
+    {"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}, {"rand", &rhs_r}};
 te_expr *te_rhs = NULL;
-
-struct FEMData {
-	FEMData(const Mesh &m);
-	const Mesh &m;
-	size_t dof;
-	TArray<double> omega;
-	TArray<double> psi;
-	FEMatrix S; // Stiffness matrix
-	FEMatrix M; // Mass matrix
-	TArray<double> b; // rhs b of linear systems
-	TArray<double> r; // current residue
-	TArray<double> p; // internal for cg
-	TArray<double> Ap; // internal for cg
-	size_t iterate = 0;
-	size_t max_iter = 10;
-	double delta_t = 0.01;
-	double relative_error = 0;
-
-	bool new_omega0();
-	void reset_omega0_psi0();
-	size_t do_iterate(size_t max_iter);
-	void transfer_omega_to_mesh(Mesh &m);
-	void transfer_psi_to_mesh(Mesh &m);
-};
 
 static void syntax(char *prg_name);
 static int load_mesh(Mesh &mesh, int argc, char **argv);
 static void rescale_and_recenter_mesh(Mesh &mesh);
 static void init_camera_for_mesh(const Mesh &mesh, Camera &camera);
-static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &mesh_gpu);
+static void update_all(PoissonSolver &solver, Mesh &mesh, GPUMesh &mesh_gpu);
 static void draw_scene(const Viewer &viewer, int shader,
 		       const GPUMesh &gpu_mesh);
-static void draw_gui(FEMData &fem);
+static void draw_gui(PoissonSolver &solver);
 static void key_cb(int key, int action, int mods, void *args);
 static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
-FEMData::FEMData(const Mesh &m)
-	: m(m)
-	, dof(m.vertex_count())
-	, omega(dof)
-	, psi(dof)
-	, b(dof)
-	, r(dof)
-	, p(dof)
-	, Ap(dof)
-{
-	build_P1_mass_matrix(m, M);
-	build_P1_stiffness_matrix(m, S);
-
-	/* TODO (shouldn't here  add the stiffness and mass matrices */
-	for (size_t i = 0; i < dof; ++i) {
-		S.diag[i] += M.diag[i];
-	}
-	for (size_t i = 0; i < m.triangle_count(); ++i) {
-		S.off_diag[3 * i + 0] += M.off_diag[i];
-		S.off_diag[3 * i + 1] += M.off_diag[i];
-		S.off_diag[3 * i + 2] += M.off_diag[i];
-	}
-}
-
-void FEMData::reset_omega0_psi0()
-{
-	for (size_t i = 0; i < dof; ++i) {
-		rhs_x = m.positions[i].x;
-		rhs_y = m.positions[i].y;
-		rhs_z = m.positions[i].z;
-		rhs_r = (double)rand() / RAND_MAX;
-		omega[i] = te_eval(te_rhs);
-		psi[i] = 0;
-	}
-	/* TODO omega should be changed to have zero mean */
-	iterate = 0;
-}
-
-bool FEMData::new_omega0()
+bool new_rhs(PoissonSolver &solver)
 {
 	srand((int)time(NULL));
-	te_expr *test = te_compile(rhs_expression, rhs_vars,
-				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
-				   NULL);
+	te_expr *test =
+	    te_compile(rhs_expression, rhs_vars,
+		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
 	if (!test)
 		return false;
+
 	te_free(te_rhs);
 	te_rhs = test;
-	reset_omega0_psi0();
+	for (size_t i = 0; i < solver.N; ++i) {
+		rhs_x = solver.m.positions[i].x;
+		rhs_y = solver.m.positions[i].y;
+		rhs_z = solver.m.positions[i].z;
+		rhs_r = (double)rand() / RAND_MAX;
+		solver.f[i] = te_eval(te_rhs);
+	}
+
+	solver.init_cg();
+	solver.iterate = 0;
+
 	return true;
 }
 
-size_t FEMData::do_iterate(size_t max_iter)
-{
-	M.mvp(omega.data, b.data);
-
-	/* Solve - Delta psi = omega */
-	size_t it1;
-	it1 = conjugate_gradient_solve(S, b.data, psi.data, r.data, p.data,
-				       Ap.data, &relative_error, 1e-6, max_iter,
-				       false);
-
-	Euler2D_apply_transport(m.indices.data, m.triangle_count(), omega.data,
-				psi.data, m.vertex_count(), Ap.data);
-	blas_axpby(delta_t, Ap.data, 1, b.data, dof);
-
-	size_t it2;
-	it2 = conjugate_gradient_solve(M, b.data, omega.data, r.data, p.data,
-				       Ap.data, &relative_error, 1e-6, max_iter,
-				       false);
-
-	printf("Iterate %zu : %zu, %zu\n", iterate, it1, it2);
-	return it1 + it2;
-}
-
-void FEMData::transfer_omega_to_mesh(Mesh &m)
+void transfer_to_mesh(const TArray<double> &V, Mesh &m)
 {
 	m.attr.resize(m.vertex_count());
 	for (size_t i = 0; i < m.vertex_count(); ++i) {
-		m.attr[i] = omega[i];
-	}
-}
-
-void FEMData::transfer_psi_to_mesh(Mesh &m)
-{
-	m.attr.resize(m.vertex_count());
-	for (size_t i = 0; i < m.vertex_count(); ++i) {
-		m.attr[i] = psi[i];
+		m.attr[i] = V[i];
 	}
 }
 
@@ -195,9 +107,12 @@ int main(int argc, char **argv)
 	LOG_MSG("Mesh rescaled and recentered.");
 
 	/* Prepare FEM data */
-	FEMData fem(mesh);
-	fem.new_omega0();
-	fem.transfer_omega_to_mesh(mesh);
+	PoissonSolver solver(mesh);
+	if (!new_rhs(solver)) {
+		LOG_MSG("Error loading rhs (expression flawed ?).");
+		exit(EXIT_FAILURE);
+	}
+	transfer_to_mesh(solver.f, mesh);
 	get_attr_bounds(mesh, &scale_min, &scale_max);
 	LOG_MSG("Prepared FEM data.");
 
@@ -205,7 +120,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
-	viewer.register_key_callback({ key_cb, NULL });
+	viewer.register_key_callback({key_cb, NULL});
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -223,10 +138,10 @@ int main(int argc, char **argv)
 	/* Main Loop */
 	while (!viewer.should_close()) {
 		viewer.poll_events();
-		update_all(fem, mesh, gpu_mesh);
+		update_all(solver, mesh, gpu_mesh);
 		viewer.begin_frame();
 		draw_scene(viewer, shader, gpu_mesh);
-		draw_gui(fem);
+		draw_gui(solver);
 		viewer.end_frame();
 	}
 
@@ -268,7 +183,7 @@ static void rescale_and_recenter_mesh(Mesh &mesh)
 	}
 	for (size_t i = 0; i < mesh.vertex_count(); ++i) {
 		mesh.positions[i] -= model_center;
-		mesh.positions[i] /= model_size;
+		mesh.positions[i] /= (model_size / 2);
 	}
 }
 
@@ -306,24 +221,21 @@ static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max)
 	*attr_max = max;
 }
 
-static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
+static void update_all(PoissonSolver &solver, Mesh &mesh, GPUMesh &gpu_mesh)
 {
 	bool needs_upload = true;
 	if (started || one_step) {
-		for (int i = 0; i < iter_per_frame; i++) {
-			fem.do_iterate(fem.max_iter);
-			fem.iterate += 1;
-		}
+		solver.do_iterate(iter_per_frame, 1e-6);
 		if (one_step) {
 			one_step = false;
 		}
-		fem.transfer_omega_to_mesh(mesh);
+		transfer_to_mesh(solver.u, mesh);
 		if (autoscale) {
 			get_attr_bounds(mesh, &scale_min, &scale_max);
 		}
 	} else if (reset) {
-		fem.reset_omega0_psi0();
-		fem.transfer_omega_to_mesh(mesh);
+		solver.clear_solution();
+		transfer_to_mesh(solver.f, mesh);
 		get_attr_bounds(mesh, &scale_min, &scale_max);
 		reset = false;
 	} else {
@@ -331,6 +243,9 @@ static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
 	}
 	if (needs_upload) {
 		gpu_mesh.update_attr();
+	}
+	if (solver.converged) {
+		started = false;
 	}
 }
 
@@ -373,17 +288,17 @@ static void draw_scene(const Viewer &viewer, int shader,
 	}
 }
 
-static void draw_gui(FEMData &fem)
+static void draw_gui(PoissonSolver &solver)
 {
 	ImGui::Begin("Controls");
-	ImGui::Text("Solves -\\Delta u + u = f");
-	ImGui::Text("------------------------");
+	ImGui::Text("Solves -\\Delta u = f");
+	ImGui::Text("--------------------");
 
 	ImGui::Text("Enter math expression for f below:");
 	ImGui::Text("(available variables : x, y, z, rand)");
 	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
 	if (ImGui::Button("Apply")) {
-		if (!fem.new_omega0()) {
+		if (!new_rhs(solver)) {
 			rhs_show_error = true;
 		}
 		started = false;
@@ -424,8 +339,8 @@ static void draw_gui(FEMData &fem)
 	}
 
 	ImGui::Text(" ");
-	ImGui::Text("Iterate : %zu", fem.iterate);
-	ImGui::Text("Relative error : %g", fem.relative_error);
+	ImGui::Text("Iterate : %zu", solver.iterate);
+	ImGui::Text("Relative error : %g", solver.rel_error);
 	ImGui::Text("Scale min %.2f Scale max %.2f  (Span : %g)", scale_min,
 		    scale_max, scale_max - scale_min);
 
@@ -440,7 +355,7 @@ static void draw_gui(FEMData &fem)
 	ImGui::DragFloat("  ", &mesh_deform, 0.01f, 0.f, 1.f);
 
 	ImGui::Text(" ");
-	ImGui::Text("Number of DOF : %zu", fem.dof);
+	ImGui::Text("Number of DOF : %zu", solver.N);
 	float fps = ImGui::GetIO().Framerate;
 	ImGui::Text("Average framerate : %.1f FPS", fps);
 

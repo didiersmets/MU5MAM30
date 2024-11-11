@@ -11,16 +11,14 @@
 
 #include "tiny_expr/tinyexpr.h"
 
-#include "P1.h"
 #include "chrono.h"
-#include "conjugate_gradient.h"
 #include "cube.h"
-#include "fem_matrix.h"
 #include "logging.h"
 #include "mesh.h"
 #include "mesh_bounds.h"
 #include "mesh_gpu.h"
 #include "mesh_io.h"
+#include "navier_stokes.h"
 #include "ndc.h"
 #include "shaders.h"
 #include "sphere.h"
@@ -41,78 +39,48 @@ bool one_step = false;
 bool reset = false;
 int iter_per_frame = 1;
 
+/* Parameters */
+float nu = 0.0001;
+float dt = 0.005;
+double tol = 1e-6;
+
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
+    "cos(5 * y * sin(7 + 13 * x^2 + 9 * z^2 - 13 * x * z + 4 * y * z))";
 bool rhs_show_error = false;
 double rhs_x, rhs_y, rhs_z, rhs_r;
 te_variable rhs_vars[] = {
     {"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}, {"rand", &rhs_r}};
 te_expr *te_rhs = NULL;
 
-struct FEMData {
-	FEMData(const Mesh &m);
-	const Mesh &m;
-	size_t dof;
-	TArray<double> f;
-	TArray<double> u;
-	FEMatrix A;	   // Matrix A of the system Au=Mf
-	FEMatrix M;	   // Mass matrix
-	TArray<double> b;  // rhs b = Mf of the system
-	TArray<double> r;  // current residue
-	TArray<double> p;  // internal for cg
-	TArray<double> Ap; // internal for cg
-	size_t iterate = 0;
-	bool converged = false;
-	double relative_error = 0;
-
-	void clear_solution();
-	bool construct_rhs();
-	size_t do_iterate(size_t max_iter);
-	void transfer_rhs_to_mesh(Mesh &m);
-	void transfer_sol_to_mesh(Mesh &m);
-};
-
 static void syntax(char *prg_name);
 static int load_mesh(Mesh &mesh, int argc, char **argv);
 static void rescale_and_recenter_mesh(Mesh &mesh);
 static void init_camera_for_mesh(const Mesh &mesh, Camera &camera);
-static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &mesh_gpu);
+static void update_all(NavierStokesSolver &solver, Mesh &mesh,
+		       GPUMesh &mesh_gpu);
 static void draw_scene(const Viewer &viewer, int shader,
 		       const GPUMesh &gpu_mesh);
-static void draw_gui(FEMData &fem);
+static void draw_gui(NavierStokesSolver &solver);
 static void key_cb(int key, int action, int mods, void *args);
 static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 
-FEMData::FEMData(const Mesh &m)
-    : m(m), dof(m.vertex_count()), f(dof), u(dof, 0.0), b(dof), r(dof), p(dof),
-      Ap(dof)
+void reset_solver(NavierStokesSolver &solver)
 {
-	build_P1_mass_matrix(m, M);
-	build_P1_stiffness_matrix(m, A);
+	for (size_t i = 0; i < solver.N; ++i) {
+		rhs_x = solver.m.positions[i].x;
+		rhs_y = solver.m.positions[i].y;
+		rhs_z = solver.m.positions[i].z;
+		rhs_r = (double)rand() / RAND_MAX;
+		solver.omega[i] = te_eval(te_rhs);
+	}
 
-	int mult = 1;
-	/* For -\Delta u + u we simply add the stiffness and mass matrices */
-	for (size_t i = 0; i < dof; ++i) {
-		A.diag[i] += mult * M.diag[i];
-	}
-	for (size_t i = 0; i < m.triangle_count(); ++i) {
-		A.off_diag[3 * i + 0] += mult * M.off_diag[i];
-		A.off_diag[3 * i + 1] += mult * M.off_diag[i];
-		A.off_diag[3 * i + 2] += mult * M.off_diag[i];
-	}
+	solver.set_zero_mean(solver.omega.data);
+	memset(solver.psi.data, 0, solver.N * sizeof(double));
+	solver.t = 0;
 }
 
-void FEMData::clear_solution()
-{
-	for (size_t i = 0; i < dof; ++i) {
-		u[i] = 0;
-	}
-	iterate = 0;
-	converged = false;
-}
-
-bool FEMData::construct_rhs()
+bool new_rhs(NavierStokesSolver &solver)
 {
 	srand((int)time(NULL));
 	te_expr *test =
@@ -120,44 +88,20 @@ bool FEMData::construct_rhs()
 		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
 	if (!test)
 		return false;
+
 	te_free(te_rhs);
 	te_rhs = test;
-	for (size_t i = 0; i < dof; ++i) {
-		rhs_x = m.positions[i].x;
-		rhs_y = m.positions[i].y;
-		rhs_z = m.positions[i].z;
-		rhs_r = (double)rand() / RAND_MAX;
-		f[i] = te_eval(te_rhs);
-	}
-	M.mvp(f.data, b.data);
+
+	reset_solver(solver);
+
 	return true;
 }
 
-size_t FEMData::do_iterate(size_t max_iter)
-{
-	size_t iter = conjugate_gradient_solve(A, b.data, u.data, r.data,
-					       p.data, Ap.data, &relative_error,
-					       1e-6, max_iter, iterate != 0);
-	iterate += iter;
-	if (iter < max_iter) {
-		converged = true;
-	}
-	return iter;
-}
-
-void FEMData::transfer_rhs_to_mesh(Mesh &m)
+void transfer_to_mesh(const TArray<double> &V, Mesh &m)
 {
 	m.attr.resize(m.vertex_count());
 	for (size_t i = 0; i < m.vertex_count(); ++i) {
-		m.attr[i] = f[i];
-	}
-}
-
-void FEMData::transfer_sol_to_mesh(Mesh &m)
-{
-	m.attr.resize(m.vertex_count());
-	for (size_t i = 0; i < m.vertex_count(); ++i) {
-		m.attr[i] = u[i];
+		m.attr[i] = V[i];
 	}
 }
 
@@ -176,9 +120,12 @@ int main(int argc, char **argv)
 	LOG_MSG("Mesh rescaled and recentered.");
 
 	/* Prepare FEM data */
-	FEMData fem(mesh);
-	fem.construct_rhs();
-	fem.transfer_rhs_to_mesh(mesh);
+	NavierStokesSolver solver(mesh);
+	if (!new_rhs(solver)) {
+		LOG_MSG("Error loading rhs (expression flawed ?).");
+		exit(EXIT_FAILURE);
+	}
+	transfer_to_mesh(solver.omega, mesh);
 	get_attr_bounds(mesh, &scale_min, &scale_max);
 	LOG_MSG("Prepared FEM data.");
 
@@ -187,6 +134,7 @@ int main(int argc, char **argv)
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Viewer App");
 	viewer.register_key_callback({key_cb, NULL});
+	viewer.mouse.set_double_click_time(-1);
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -204,10 +152,10 @@ int main(int argc, char **argv)
 	/* Main Loop */
 	while (!viewer.should_close()) {
 		viewer.poll_events();
-		update_all(fem, mesh, gpu_mesh);
+		update_all(solver, mesh, gpu_mesh);
 		viewer.begin_frame();
 		draw_scene(viewer, shader, gpu_mesh);
-		draw_gui(fem);
+		draw_gui(solver);
 		viewer.end_frame();
 	}
 
@@ -287,21 +235,22 @@ static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max)
 	*attr_max = max;
 }
 
-static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
+static void update_all(NavierStokesSolver &solver, Mesh &mesh,
+		       GPUMesh &gpu_mesh)
 {
 	bool needs_upload = true;
 	if (started || one_step) {
-		fem.do_iterate(iter_per_frame);
+		solver.time_step(dt, nu);
 		if (one_step) {
 			one_step = false;
 		}
-		fem.transfer_sol_to_mesh(mesh);
+		transfer_to_mesh(solver.omega, mesh);
 		if (autoscale) {
 			get_attr_bounds(mesh, &scale_min, &scale_max);
 		}
 	} else if (reset) {
-		fem.clear_solution();
-		fem.transfer_rhs_to_mesh(mesh);
+		reset_solver(solver);
+		transfer_to_mesh(solver.omega, mesh);
 		get_attr_bounds(mesh, &scale_min, &scale_max);
 		reset = false;
 	} else {
@@ -309,9 +258,6 @@ static void update_all(FEMData &fem, Mesh &mesh, GPUMesh &gpu_mesh)
 	}
 	if (needs_upload) {
 		gpu_mesh.update_attr();
-	}
-	if (fem.converged) {
-		started = false;
 	}
 }
 
@@ -354,17 +300,18 @@ static void draw_scene(const Viewer &viewer, int shader,
 	}
 }
 
-static void draw_gui(FEMData &fem)
+static void draw_gui(NavierStokesSolver &solver)
 {
 	ImGui::Begin("Controls");
-	ImGui::Text("Solves -\\Delta u + u = f");
-	ImGui::Text("------------------------");
+	ImGui::Text("Navier Stokes solver");
+	ImGui::Text("--------------------");
 
-	ImGui::Text("Enter math expression for f below:");
+	ImGui::Text("Enter math expression for vorticity below:");
 	ImGui::Text("(available variables : x, y, z, rand)");
+	ImGui::Text("Zero mean automatically achieved by adding constant");
 	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
 	if (ImGui::Button("Apply")) {
-		if (!fem.construct_rhs()) {
+		if (!new_rhs(solver)) {
 			rhs_show_error = true;
 		}
 		started = false;
@@ -405,8 +352,9 @@ static void draw_gui(FEMData &fem)
 	}
 
 	ImGui::Text(" ");
-	ImGui::Text("Iterate : %zu", fem.iterate);
-	ImGui::Text("Relative error : %g", fem.relative_error);
+	ImGui::DragFloat("nu", &nu, 0.0001f, 0.f, 0.01f, "%.5f");
+	ImGui::DragFloat("dt", &dt, 0.001f, 0.f, 0.1f, "%.4f");
+	ImGui::Text("Time : %f", solver.t);
 	ImGui::Text("Scale min %.2f Scale max %.2f  (Span : %g)", scale_min,
 		    scale_max, scale_max - scale_min);
 
@@ -416,12 +364,12 @@ static void draw_gui(FEMData &fem)
 	ImGui::Checkbox("Show edges", &draw_edges);
 	ImGui::Text("Iterations per frame :");
 	ImGui::DragInt(" ", &iter_per_frame, 1, 1, 20);
-	ImGui::Text("Artificially deform mesh according to u :");
-	ImGui::Text("(may help visualize oscillations of u)");
+	ImGui::Text("Artificially deform mesh according to omega :");
+	ImGui::Text("(may help visualize oscillations)");
 	ImGui::DragFloat("  ", &mesh_deform, 0.01f, 0.f, 1.f);
 
 	ImGui::Text(" ");
-	ImGui::Text("Number of DOF : %zu", fem.dof);
+	ImGui::Text("Number of DOF : %zu", solver.N);
 	float fps = ImGui::GetIO().Framerate;
 	ImGui::Text("Average framerate : %.1f FPS", fps);
 

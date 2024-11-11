@@ -9,7 +9,7 @@ struct FEMatrix : public Matrix {
 		P1_cst, /* P1 with constant off diag coeffs  */
 		P1_sym, /* P1 with symmetric off diag coeffs */
 		P1_gen, /* P1 with general off diag coeffs   */
-		/* TODO Deal with more FEM types             */
+			/* TODO Deal with more FEM types             */
 	};
 	FEMType fem_type;
 	const Mesh *m;
@@ -18,5 +18,6 @@ struct FEMatrix : public Matrix {
 
 	void mvp(const double *__restrict x,
 		 double *__restrict y) const override final;
+	double sum() const override final;
 };
 

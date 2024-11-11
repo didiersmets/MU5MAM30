@@ -31,6 +31,26 @@ void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
 	}
 }
 
+double sum_P1_cst(const FEMatrix &A)
+{
+	assert(A.fem_type == FEMatrix::P1_cst);
+
+	size_t vtx_count = A.m->vertex_count();
+	size_t tri_count = A.m->triangle_count();
+
+	double sum = 0.0;
+
+	for (size_t v = 0; v < vtx_count; ++v) {
+		sum += A.diag[v];
+	}
+
+	for (size_t t = 0; t < tri_count; ++t) {
+		sum += 6 * A.off_diag[t];
+	}
+
+	return sum;
+}
+
 void mvp_P1_sym(const FEMatrix &A, const double *x, double *y)
 {
 	assert(A.fem_type == FEMatrix::P1_sym);
@@ -56,6 +76,28 @@ void mvp_P1_sym(const FEMatrix &A, const double *x, double *y)
 	}
 }
 
+double sum_P1_sym(const FEMatrix &A)
+{
+	assert(A.fem_type == FEMatrix::P1_sym);
+
+	size_t vtx_count = A.m->vertex_count();
+	size_t tri_count = A.m->triangle_count();
+
+	double sum = 0.0;
+
+	for (size_t v = 0; v < vtx_count; ++v) {
+		sum += A.diag[v];
+	}
+
+	for (size_t t = 0; t < tri_count; ++t) {
+		sum += 2 * A.off_diag[3 * t + 0];
+		sum += 2 * A.off_diag[3 * t + 1];
+		sum += 2 * A.off_diag[3 * t + 3];
+	}
+
+	return sum;
+}
+
 void mvp_P1_gen(const FEMatrix &A, const double *x, double *y)
 {
 	assert(A.fem_type == FEMatrix::P1_sym);
@@ -79,6 +121,31 @@ void mvp_P1_gen(const FEMatrix &A, const double *x, double *y)
 		y[c] += A.off_diag[6 * t + 4] * x[a];
 		y[a] += A.off_diag[6 * t + 5] * x[c];
 	}
+}
+
+double sum_P1_gen(const FEMatrix &A)
+{
+	assert(A.fem_type == FEMatrix::P1_sym);
+
+	size_t vtx_count = A.m->vertex_count();
+	size_t tri_count = A.m->triangle_count();
+
+	double sum = 0.0;
+
+	for (size_t v = 0; v < vtx_count; ++v) {
+		sum += A.diag[v];
+	}
+
+	for (size_t t = 0; t < tri_count; ++t) {
+		sum += A.off_diag[6 * t + 0];
+		sum += A.off_diag[6 * t + 1];
+		sum += A.off_diag[6 * t + 2];
+		sum += A.off_diag[6 * t + 3];
+		sum += A.off_diag[6 * t + 4];
+		sum += A.off_diag[6 * t + 5];
+	}
+
+	return sum;
 }
 
 static void stiffness(const Vec3d &AB, const Vec3d &AC, double *__restrict S);

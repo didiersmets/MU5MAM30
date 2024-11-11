@@ -61,8 +61,8 @@ target_link_libraries(test_viewer PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
 ###############################################################################
 
 ###############################################################################
-add_executable(test_euler2D
-	src/bin/test_euler2D.cpp
+add_executable(test_poisson
+	src/bin/test_poisson.cpp
 	src/common/chrono.cpp
 	src/common/logging.c
 	src/mesh/duplicate_verts.cpp
@@ -79,10 +79,10 @@ add_executable(test_euler2D
 	src/viewer/shaders.cpp
 	src/fem/fem_matrix.cpp
 	src/fem/P1.cpp
-	src/fem/euler2D.cpp
+	src/fem/poisson.cpp
 	src/linalg/conjugate_gradient.cpp
 )
-target_include_directories(test_euler2D PRIVATE 
+target_include_directories(test_poisson PRIVATE 
 	include/common 
 	include/mesh 
 	include/viewer
@@ -91,8 +91,43 @@ target_include_directories(test_euler2D PRIVATE
 	extern
 	extern/glfw/include
 )
-target_compile_options(test_euler2D PUBLIC -Wall -Wextra -Wno-missing-field-initializers)
-target_link_libraries(test_euler2D PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
+target_compile_options(test_poisson PUBLIC -Wall -Wextra -Wno-missing-field-initializers)
+target_link_libraries(test_poisson PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
+###############################################################################
+
+###############################################################################
+add_executable(test_NS
+	src/bin/test_navier_stokes.cpp
+	src/common/chrono.cpp
+	src/common/logging.c
+	src/mesh/duplicate_verts.cpp
+	src/mesh/cube.cpp
+	src/mesh/sphere.cpp
+	src/mesh/mesh_bounds.cpp
+	src/mesh/mesh_gpu.cpp
+	src/mesh/mesh_io.cpp
+	src/viewer/viewer.cpp
+	src/viewer/camera.cpp
+	src/viewer/frustum.cpp
+	src/viewer/mouse.cpp
+	src/viewer/trackball.cpp
+	src/viewer/shaders.cpp
+	src/fem/fem_matrix.cpp
+	src/fem/P1.cpp
+	src/fem/navier_stokes.cpp
+	src/linalg/conjugate_gradient.cpp
+)
+target_include_directories(test_NS PRIVATE 
+	include/common 
+	include/mesh 
+	include/viewer
+	include/fem
+	include/linalg
+	extern
+	extern/glfw/include
+)
+target_compile_options(test_NS PUBLIC -Wall -Wextra -Wno-missing-field-initializers)
+target_link_libraries(test_NS PRIVATE glfw imgui_glfw_opengl3 GL tiny_expr)
 ###############################################################################
 
 ###############################################################################
