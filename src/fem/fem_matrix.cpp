@@ -1,7 +1,6 @@
-#include <string.h>
+#include "fem_matrix.h"
 
 #include "P1.h"
-#include "fem_matrix.h"
 
 void FEMatrix::mvp(const double *x, double *y) const
 {
@@ -27,5 +26,7 @@ double FEMatrix::sum() const
 		return sum_P1_sym(*this);
 	case FEMatrix::P1_gen:
 		return sum_P1_gen(*this);
+	default:
+		return 0;
 	}
 }

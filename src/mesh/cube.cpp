@@ -4,7 +4,6 @@
 
 #include "cube.h"
 #include "duplicate_verts.h"
-#include "logging.h"
 #include "math_utils.h"
 #include "mesh.h"
 #include "sys_utils.h"
@@ -29,12 +28,12 @@ static void load_cube_vertices(Vec3 *pos, size_t subdiv)
 	}
 	for (size_t y = 0; y < n; ++y) {
 		for (size_t x = 0; x < n; ++x) {
-			pos[voff[0]++] = {dir[x], -1, dir[y]}; /* Front  */
-			pos[voff[1]++] = {rev[x], +1, dir[y]}; /* Back   */
-			pos[voff[2]++] = {-1, rev[x], dir[y]}; /* Left   */
-			pos[voff[3]++] = {+1, dir[x], dir[y]}; /* Right  */
-			pos[voff[4]++] = {dir[x], rev[y], -1}; /* Bottom */
-			pos[voff[5]++] = {dir[x], dir[y], +1}; /* Top    */
+			pos[voff[0]++] = { dir[x], -1, dir[y] }; /* Front  */
+			pos[voff[1]++] = { rev[x], +1, dir[y] }; /* Back   */
+			pos[voff[2]++] = { -1, rev[x], dir[y] }; /* Left   */
+			pos[voff[3]++] = { +1, dir[x], dir[y] }; /* Right  */
+			pos[voff[4]++] = { dir[x], rev[y], -1 }; /* Bottom */
+			pos[voff[5]++] = { dir[x], dir[y], +1 }; /* Top    */
 		}
 	}
 	free(dir);

@@ -8,13 +8,20 @@
 #include "tiny_blas.h"
 
 PoissonSolver::PoissonSolver(const Mesh &m)
-    : m(m), N(m.vertex_count()), f(N), u(N, 0.0), r(N), p(N), Ap(N)
+	: m(m)
+	, N(m.vertex_count())
+	, f(N)
+	, u(N, 0.0)
+	, r(N)
+	, p(N)
+	, Ap(N)
 {
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, A);
 	vol = M.sum();
 	inited = false;
 	iterate = 0;
+	converged = false;
 }
 
 void PoissonSolver::clear_solution()
@@ -38,7 +45,6 @@ void PoissonSolver::set_zero_mean(double *V)
 
 void PoissonSolver::init_cg()
 {
-
 	double *F = f.data;
 	double *U = u.data;
 	double *R = r.data;

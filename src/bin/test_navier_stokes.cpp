@@ -3,7 +3,7 @@
 #include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
+#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -11,7 +11,6 @@
 
 #include "tiny_expr/tinyexpr.h"
 
-#include "chrono.h"
 #include "cube.h"
 #include "logging.h"
 #include "mesh.h"
@@ -25,7 +24,7 @@
 #include "viewer.h"
 
 /* Viewer config */
-float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
+float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -37,20 +36,20 @@ bool autoscale = true;
 bool started = false;
 bool one_step = false;
 bool reset = false;
-int iter_per_frame = 1;
 
 /* Parameters */
-float nu = 0.0001;
+float lognu = -4;
 float dt = 0.005;
 double tol = 1e-6;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-    "cos(5 * y * sin(7 + 13 * x^2 + 9 * z^2 - 13 * x * z + 4 * y * z))";
+	"100 * z * exp(-50*z^2) * (1 + 0.5 * cos(20 * theta))";
 bool rhs_show_error = false;
-double rhs_x, rhs_y, rhs_z, rhs_r;
-te_variable rhs_vars[] = {
-    {"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}, {"rand", &rhs_r}};
+double rhs_x, rhs_y, rhs_z, rhs_p, rhs_t, rhs_r;
+te_variable rhs_vars[] = { { "x", &rhs_x },	{ "y", &rhs_y },
+			   { "z", &rhs_z },	{ "phi", &rhs_p },
+			   { "theta", &rhs_t }, { "rand", &rhs_r } };
 te_expr *te_rhs = NULL;
 
 static void syntax(char *prg_name);
@@ -71,6 +70,8 @@ void reset_solver(NavierStokesSolver &solver)
 		rhs_x = solver.m.positions[i].x;
 		rhs_y = solver.m.positions[i].y;
 		rhs_z = solver.m.positions[i].z;
+		rhs_p = atan2(rhs_y, rhs_x);
+		rhs_t = atan2(sqrt(rhs_x * rhs_x + rhs_y * rhs_y), rhs_z);
 		rhs_r = (double)rand() / RAND_MAX;
 		solver.omega[i] = te_eval(te_rhs);
 	}
@@ -83,9 +84,9 @@ void reset_solver(NavierStokesSolver &solver)
 bool new_rhs(NavierStokesSolver &solver)
 {
 	srand((int)time(NULL));
-	te_expr *test =
-	    te_compile(rhs_expression, rhs_vars,
-		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
+	te_expr *test = te_compile(rhs_expression, rhs_vars,
+				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
+				   NULL);
 	if (!test)
 		return false;
 
@@ -132,8 +133,8 @@ int main(int argc, char **argv)
 	/* Get an OpenGL context through a viewer app. */
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
-	viewer.init("Viewer App");
-	viewer.register_key_callback({key_cb, NULL});
+	viewer.init("Navier Stokes 2D solver (vorticity formulation)");
+	viewer.register_key_callback({ key_cb, NULL });
 	viewer.mouse.set_double_click_time(-1);
 	LOG_MSG("Viewer initialized.");
 
@@ -240,7 +241,7 @@ static void update_all(NavierStokesSolver &solver, Mesh &mesh,
 {
 	bool needs_upload = true;
 	if (started || one_step) {
-		solver.time_step(dt, nu);
+		solver.time_step(dt, pow(10, lognu));
 		if (one_step) {
 			one_step = false;
 		}
@@ -306,9 +307,9 @@ static void draw_gui(NavierStokesSolver &solver)
 	ImGui::Text("Navier Stokes solver");
 	ImGui::Text("--------------------");
 
-	ImGui::Text("Enter math expression for vorticity below:");
-	ImGui::Text("(available variables : x, y, z, rand)");
-	ImGui::Text("Zero mean automatically achieved by adding constant");
+	ImGui::Text("Enter math expression for initial vorticity below:");
+	ImGui::Text("(available variables : x, y, z, phi, theta, rand)");
+	ImGui::Text("(zero mean automatically achieved by adding constant)");
 	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
 	if (ImGui::Button("Apply")) {
 		if (!new_rhs(solver)) {
@@ -329,7 +330,6 @@ static void draw_gui(NavierStokesSolver &solver)
 	ImGui::Text(" ");
 	ImGui::Text("Solution value is represented by color :");
 	ImGui::Text("Red = low value, Green = mid, Blue = high.");
-	ImGui::Text("Shows f at iter 0, then succive u_n iterates of cg.");
 
 	ImGui::Text(" ");
 
@@ -350,23 +350,22 @@ static void draw_gui(NavierStokesSolver &solver)
 	if (ImGui::Button("Reset")) {
 		reset = true;
 	}
-
-	ImGui::Text(" ");
-	ImGui::DragFloat("nu", &nu, 0.0001f, 0.f, 0.01f, "%.5f");
-	ImGui::DragFloat("dt", &dt, 0.001f, 0.f, 0.1f, "%.4f");
 	ImGui::Text("Time : %f", solver.t);
 	ImGui::Text("Scale min %.2f Scale max %.2f  (Span : %g)", scale_min,
 		    scale_max, scale_max - scale_min);
 
 	ImGui::Text(" ");
-	ImGui::Text("Controls :");
-	ImGui::Checkbox("Autoscale", &autoscale);
-	ImGui::Checkbox("Show edges", &draw_edges);
-	ImGui::Text("Iterations per frame :");
-	ImGui::DragInt(" ", &iter_per_frame, 1, 1, 20);
+	ImGui::Text("Controls");
+	ImGui::Text("--------");
+	ImGui::Text("Viscosity (negative power of 10):");
+	ImGui::SliderFloat("lognu", &lognu, -8, 0, "10^(%.1f)");
+	ImGui::Text("Time step :");
+	ImGui::SliderFloat("dt", &dt, 0.f, 0.01f, "%.4f");
+	ImGui::Checkbox("Autoscale colors to bounds", &autoscale);
+	ImGui::Checkbox("Show mesh edges", &draw_edges);
 	ImGui::Text("Artificially deform mesh according to omega :");
 	ImGui::Text("(may help visualize oscillations)");
-	ImGui::DragFloat("  ", &mesh_deform, 0.01f, 0.f, 1.f);
+	ImGui::SliderFloat("  ", &mesh_deform, 0.f, 1.f);
 
 	ImGui::Text(" ");
 	ImGui::Text("Number of DOF : %zu", solver.N);

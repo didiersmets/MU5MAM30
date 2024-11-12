@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <omp.h>
+
 void inline blas_copy(const double *src, double *dest, size_t N)
 {
 	memcpy(dest, src, N * sizeof(double));
@@ -12,6 +14,7 @@ void inline blas_copy(const double *src, double *dest, size_t N)
 void inline blas_axpy(double a, const double *__restrict x,
 		      double *__restrict y, size_t N)
 {
+#pragma omp parallel for
 	for (size_t i = 0; i < N; ++i) {
 		y[i] += a * x[i];
 	}
@@ -20,6 +23,7 @@ void inline blas_axpy(double a, const double *__restrict x,
 void inline blas_axpby(double a, const double *__restrict x, double b,
 		       double *__restrict y, size_t N)
 {
+#pragma omp parallel for
 	for (size_t i = 0; i < N; ++i) {
 		y[i] = a * x[i] + b * y[i];
 	}
@@ -28,10 +32,21 @@ void inline blas_axpby(double a, const double *__restrict x, double b,
 double inline blas_dot_old(const double *x, const double *y, size_t N)
 {
 	double res = 0.0;
+#pragma omp parallel for reduction(+ : res)
 	for (size_t i = 0; i < N; ++i) {
 		res += x[i] * y[i];
 	}
 	return (res);
+}
+
+double inline blas_sum(double *x, size_t N)
+{
+	double sum = 0;
+#pragma omp parallel for reduction(+ : sum)
+	for (size_t i = 0; i < N; ++i) {
+		sum += x[i];
+	}
+	return sum;
 }
 
 double inline blas_sum_in_place(double *x, size_t N)

@@ -3,7 +3,7 @@
 #include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
+#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -11,7 +11,6 @@
 
 #include "tiny_expr/tinyexpr.h"
 
-#include "chrono.h"
 #include "cube.h"
 #include "logging.h"
 #include "mesh.h"
@@ -25,7 +24,7 @@
 #include "viewer.h"
 
 /* Viewer config */
-float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
+float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -41,11 +40,12 @@ int iter_per_frame = 1;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-    "cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
+	"cos(35 * y * sin(27 + 13 * x^2 + 19 * z^2 - 13 * x * z))";
 bool rhs_show_error = false;
-double rhs_x, rhs_y, rhs_z, rhs_r;
-te_variable rhs_vars[] = {
-    {"x", &rhs_x}, {"y", &rhs_y}, {"z", &rhs_z}, {"rand", &rhs_r}};
+double rhs_x, rhs_y, rhs_z, rhs_p, rhs_t, rhs_r;
+te_variable rhs_vars[] = { { "x", &rhs_x },	{ "y", &rhs_y },
+			   { "z", &rhs_z },	{ "phi", &rhs_p },
+			   { "theta", &rhs_t }, { "rand", &rhs_r } };
 te_expr *te_rhs = NULL;
 
 static void syntax(char *prg_name);
@@ -62,9 +62,9 @@ static void get_attr_bounds(const Mesh &m, float *attr_min, float *attr_max);
 bool new_rhs(PoissonSolver &solver)
 {
 	srand((int)time(NULL));
-	te_expr *test =
-	    te_compile(rhs_expression, rhs_vars,
-		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
+	te_expr *test = te_compile(rhs_expression, rhs_vars,
+				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
+				   NULL);
 	if (!test)
 		return false;
 
@@ -74,6 +74,8 @@ bool new_rhs(PoissonSolver &solver)
 		rhs_x = solver.m.positions[i].x;
 		rhs_y = solver.m.positions[i].y;
 		rhs_z = solver.m.positions[i].z;
+		rhs_p = atan2(rhs_y, rhs_x);
+		rhs_t = atan2(sqrt(rhs_x * rhs_x + rhs_y * rhs_y), rhs_z);
 		rhs_r = (double)rand() / RAND_MAX;
 		solver.f[i] = te_eval(te_rhs);
 	}
@@ -119,8 +121,8 @@ int main(int argc, char **argv)
 	/* Get an OpenGL context through a viewer app. */
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
-	viewer.init("Viewer App");
-	viewer.register_key_callback({key_cb, NULL});
+	viewer.init("Poisson solver");
+	viewer.register_key_callback({ key_cb, NULL });
 	LOG_MSG("Viewer initialized.");
 
 	/* Prepare GPU data */
@@ -295,7 +297,7 @@ static void draw_gui(PoissonSolver &solver)
 	ImGui::Text("--------------------");
 
 	ImGui::Text("Enter math expression for f below:");
-	ImGui::Text("(available variables : x, y, z, rand)");
+	ImGui::Text("(available variables : x, y, z, theta, phi, rand)");
 	ImGui::InputText("", rhs_expression, IM_ARRAYSIZE(rhs_expression));
 	if (ImGui::Button("Apply")) {
 		if (!new_rhs(solver)) {
@@ -316,7 +318,7 @@ static void draw_gui(PoissonSolver &solver)
 	ImGui::Text(" ");
 	ImGui::Text("Solution value is represented by color :");
 	ImGui::Text("Red = low value, Green = mid, Blue = high.");
-	ImGui::Text("Shows f at iter 0, then succive u_n iterates of cg.");
+	ImGui::Text("Shows f at iter 0, then successive u_n iterates of cg.");
 
 	ImGui::Text(" ");
 
