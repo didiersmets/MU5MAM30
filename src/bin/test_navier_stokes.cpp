@@ -3,7 +3,7 @@
 #include <time.h>
 
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
+	#define GL_GLEXT_PROTOTYPES 1
 #endif
 #include "imgui/imgui.h"
 #include <GL/gl.h>
@@ -24,7 +24,7 @@
 #include "viewer.h"
 
 /* Viewer config */
-float bgcolor[4] = { 0.3, 0.3, 0.3, 1.0 };
+float bgcolor[4] = {0.3, 0.3, 0.3, 1.0};
 bool draw_surface = true;
 bool draw_edges = false;
 float scale_min;
@@ -44,12 +44,11 @@ double tol = 1e-6;
 
 /* RHS expression of the PDE */
 char rhs_expression[128] =
-	"100 * z * exp(-50*z^2) * (1 + 0.5 * cos(20 * theta))";
+    "100 * z * exp(-50*z^2) * (1 + 0.5 * cos(20 * theta))";
 bool rhs_show_error = false;
 double rhs_x, rhs_y, rhs_z, rhs_p, rhs_t, rhs_r;
-te_variable rhs_vars[] = { { "x", &rhs_x },	{ "y", &rhs_y },
-			   { "z", &rhs_z },	{ "phi", &rhs_p },
-			   { "theta", &rhs_t }, { "rand", &rhs_r } };
+te_variable rhs_vars[] = {{"x", &rhs_x},   {"y", &rhs_y},     {"z", &rhs_z},
+			  {"phi", &rhs_p}, {"theta", &rhs_t}, {"rand", &rhs_r}};
 te_expr *te_rhs = NULL;
 
 static void syntax(char *prg_name);
@@ -84,9 +83,9 @@ void reset_solver(NavierStokesSolver &solver)
 bool new_rhs(NavierStokesSolver &solver)
 {
 	srand((int)time(NULL));
-	te_expr *test = te_compile(rhs_expression, rhs_vars,
-				   sizeof(rhs_vars) / sizeof(rhs_vars[0]),
-				   NULL);
+	te_expr *test =
+	    te_compile(rhs_expression, rhs_vars,
+		       sizeof(rhs_vars) / sizeof(rhs_vars[0]), NULL);
 	if (!test)
 		return false;
 
@@ -134,7 +133,7 @@ int main(int argc, char **argv)
 	Viewer viewer;
 	init_camera_for_mesh(mesh, viewer.camera);
 	viewer.init("Navier Stokes 2D solver (vorticity formulation)");
-	viewer.register_key_callback({ key_cb, NULL });
+	viewer.register_key_callback({key_cb, NULL});
 	viewer.mouse.set_double_click_time(-1);
 	LOG_MSG("Viewer initialized.");
 
@@ -358,7 +357,7 @@ static void draw_gui(NavierStokesSolver &solver)
 	ImGui::Text("Controls");
 	ImGui::Text("--------");
 	ImGui::Text("Viscosity (negative power of 10):");
-	ImGui::SliderFloat("lognu", &lognu, -8, 0, "10^(%.1f)");
+	ImGui::SliderFloat("nu", &lognu, -8, 0, "10^(%.1f)");
 	ImGui::Text("Time step :");
 	ImGui::SliderFloat("dt", &dt, 0.f, 0.01f, "%.4f");
 	ImGui::Checkbox("Autoscale colors to bounds", &autoscale);

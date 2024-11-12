@@ -58,7 +58,6 @@ size_t NavierStokesSolver::compute_stream_function()
 	double *MOm = Momega.data;
 	double *Psi = psi.data;
 
-	/* TODO : keep here ? */
 	M.mvp(Om, MOm);
 
 	/* Compute rhs norm2 */

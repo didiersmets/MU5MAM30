@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(USE_OPEN_MP FALSE)
-
 project(MU5MAM30 LANGUAGES CXX C)
 
-
 ###############################################################################
+set(USE_OPEN_MP FALSE)
 if (USE_OPEN_MP)
 	find_package(OpenMP)
 endif()
@@ -33,7 +30,7 @@ target_compile_options(nanofem PRIVATE
 	-Wall -Wextra -ffast-math -march=native -Wno-unknown-pragmas
 )
 if (USE_OPEN_MP AND OpenMP_CXX_FOUND)
-	target_link_libraries(tiny_fem PUBLIC OpenMP::OpenMP_CXX)
+	target_link_libraries(nanofem PUBLIC OpenMP::OpenMP_CXX)
 endif()
 ###############################################################################
 
