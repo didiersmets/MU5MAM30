@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef USE_OPENMP
 #include <omp.h>
+#endif
 
 #include "P1.h"
 #include "fem_matrix.h"
@@ -15,7 +17,9 @@ void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
 	size_t tri_count = A.m->triangle_count();
 	const TArray<uint32_t> &idx = A.m->indices;
 
+#ifdef USE_OPENMP
 #pragma omp parallel for
+#endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		y[v] = A.diag[v] * x[v];
 	}
@@ -43,13 +47,17 @@ double sum_P1_cst(const FEMatrix &A)
 	size_t tri_count = A.m->triangle_count();
 
 	double sum1 = 0.0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum1)
+#endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
 	}
 
 	double sum2 = 0.0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum2)
+#endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += 6 * A.off_diag[t];
 	}
@@ -65,7 +73,9 @@ void mvp_P1_sym(const FEMatrix &A, const double *x, double *y)
 	size_t tri_count = A.m->triangle_count();
 	const TArray<uint32_t> &idx = A.m->indices;
 
+#ifdef USE_OPENMP
 #pragma omp parallel for
+#endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		y[v] = A.diag[v] * x[v];
 	}
@@ -92,13 +102,17 @@ double sum_P1_sym(const FEMatrix &A)
 	size_t tri_count = A.m->triangle_count();
 
 	double sum1 = 0.0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum1)
+#endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
 	}
 
 	double sum2 = 0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum2)
+#endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += 2 * A.off_diag[3 * t + 0];
 		sum2 += 2 * A.off_diag[3 * t + 1];
@@ -141,13 +155,17 @@ double sum_P1_gen(const FEMatrix &A)
 	size_t tri_count = A.m->triangle_count();
 
 	double sum1 = 0.0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum1)
+#endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
 	}
 
 	double sum2 = 0.0;
+#ifdef USE_OPENMP
 #pragma omp parallel for reduction(+ : sum2)
+#endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += A.off_diag[6 * t + 0];
 		sum2 += A.off_diag[6 * t + 1];

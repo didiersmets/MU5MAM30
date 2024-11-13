@@ -3,8 +3,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(MU5MAM30 LANGUAGES CXX C)
 
 ###############################################################################
-set(USE_OPEN_MP FALSE)
-if (USE_OPEN_MP)
+set(USE_OPENMP FALSE)
+if (USE_OPENMP)
 	find_package(OpenMP)
 endif()
 add_library(nanofem
@@ -29,7 +29,8 @@ target_include_directories(nanofem PUBLIC
 target_compile_options(nanofem PRIVATE 
 	-Wall -Wextra -ffast-math -march=native -Wno-unknown-pragmas
 )
-if (USE_OPEN_MP AND OpenMP_CXX_FOUND)
+if (USE_OPENMP AND OpenMP_CXX_FOUND)
+	target_compile_options(nanofem PRIVATE -DUSE_OPENMP)
 	target_link_libraries(nanofem PUBLIC OpenMP::OpenMP_CXX)
 endif()
 ###############################################################################
