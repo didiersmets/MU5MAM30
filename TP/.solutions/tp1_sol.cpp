@@ -349,6 +349,7 @@ int build_cube_vertices(struct Vertex *vert, int N)
 	int V = N + 1;
 	int nvf = V * V;
 	int v = 0;
+	
 	for (int row = 0; row < V; row++) {
 		for (int col = 0; col < V; col++) {
 			vert[0 * nvf + v].x = col;

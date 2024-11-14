@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "hash_table.h"
+
+#define FAST 1
 
 /* The goal of this TP is to get acquainted with C (not yet C++)
  * and at the same time solve the equation
@@ -220,6 +223,7 @@ int gradient_system_solve(const struct SparseMatrix *S,
     double tol = 1e-6;
     double tol2 = tol*tol;
     double error2 = blas_dot(r,r,N);
+
     while(error2 > tol2 && iterate < iter_max){
 
         matrix_vector_product(S,r,Ar);
@@ -314,24 +318,41 @@ int main(int argc, char **argv)
 int build_cube_vertices(struct Vertex *vert, int N){
     int V = N + 1;
 	assert(V > 0);
-	int NF = V * V; // Number of vertices per face
-	double mult = 2. / (V - 1);
+	int NVF = V * V; // Number of vertices per face
+	//double mult = 2. / (V - 1); //Better not use this as by floating points errors
 	int k = 0;
 
 	for (int i = 0; i < V; i++) {
 		for (int j = 0; j < V; j++) {
 
-			vert[0*NF + k] = {-1,-1 + i*mult,-1 + j*mult};
-			vert[1*NF + k] = {1, -1 + i*mult,-1 + j*mult};
-			vert[2*NF + k] = {-1 + i*mult, -1,-1 + j*mult};
-			vert[3*NF + k] = {-1 + i*mult, 1 , -1 + j*mult};
-			vert[4*NF + k] = {-1 + i*mult,-1 + j*mult , -1};
-			vert[5*NF + k] = {-1 + i*mult, -1 + j*mult, 1};
+			vert[0*NVF + k].x = j;
+			vert[0*NVF + k].y = 0;
+			vert[0*NVF + k].z = i;
 
-			k++;
+			vert[1*NVF + k].x = N;
+			vert[1*NVF + k].y = j;
+			vert[1*NVF + k].z = i;
+
+			vert[2*NVF + k].x = N - j;
+			vert[2*NVF + k].y = N;
+			vert[2*NVF + k].z = i;
+
+			vert[3*NVF + k].x = 0;
+			vert[3*NVF + k].y = N - j;
+			vert[3*NVF + k].z = i;
+
+			vert[4*NVF + k].x = j;
+			vert[4*NVF + k].y = N - i;
+			vert[4*NVF + k].z = 0;
+
+			vert[5*NVF + k].x = j;
+			vert[5*NVF + k].y = i;
+			vert[5*NVF + k].z = N;
+
+			k++; // in the end it will be equal to NVF - 1
 		}
 	}
-	return 6 * NF;
+	return 6 * NVF;
 }
 
 int build_cube_triangles(struct Triangle *tri, int N){
@@ -346,86 +367,142 @@ int build_cube_triangles(struct Triangle *tri, int N){
 			}
 		}
 	}
+	assert(t == 12 * N * N);
 	return t;
 }
 
 
-
+#if FAST == 1
 int dedup_mesh_vertices(struct Mesh *m){
-	int count = 0;
-	int N = m->vtx_count;
-	int V = sqrt(N/6);
-	int NF = V * V;
-	int *change = (int *)malloc(N * sizeof(int));
-	for (int i = 0; i < N; i++){
-		if((abs(m->vertices[i].x) == 1 && abs(m->vertices[i].y) == 1) || 
-		   (abs(m->vertices[i].x) == 1 && abs(m->vertices[i].z) == 1) || 
-		   (abs(m->vertices[i].y) == 1 && abs(m->vertices[i].z) == 1)){
-			if((i >= 2*NF && i < 2*NF + V) || (i >= 2*NF + (V-1)*V && i < 3*NF) ||
-			   (i >= 3*NF && i < 3*NF + V) || (i >= 3*NF + (V-1)*V && i < 4*NF) ||
-			   i >= 4*NF){
-				change[i] = count;
-			   }
-			   else{
-				   change[i] = count;
-				   count++;
-			   }
+
+	HashTable<int, int> remap(m->vtx_count);
+	int Ntot = m->vtx_count;
+	int NVF = Ntot / 6; 
+	int N = (int) sqrt(NVF + 0.5); //0.5 just not to have problems with floating points
+	assert(N * N == NVF);
+	int vtx_count = 0;
+
+
+	for(int i = 0; i < Ntot; i++){
+		
+		if(remap.get(m->vertices[i].x + (N + 1) * m->vertices[i].y + (N + 1)*(N + 1)*m->vertices[i].z) == nullptr){
+			remap.set_at(m->vertices[i].x + (N + 1) * m->vertices[i].y + (N + 1)*(N + 1)*m->vertices[i].z , vtx_count);
+			vtx_count++;
 		}
-		else{
-			change[i] = count;
-			count++;
-		}
+		/*else{ //not necessary
+			remap.set_at(m->vertices[i].x + (N + 1) * m->vertices[i].y + (N + 1)*(N + 1)*m->vertices[i].z , *remap.get(m->vertices[i].x + (N + 1) * m->vertices[i].y + (N + 1)*(N + 1)*m->vertices[i].z));
+		}*/
+	}
+	
+	for(int i = 0; i < m->tri_count; i++){
+
+		struct Triangle *T = &m->triangles[i];
+
+		T->a = *remap.get(m->vertices[T->a].x + (N + 1) * m->vertices[T->a].y + (N + 1)*(N + 1)*m->vertices[T->a].z);
+		assert(T->a < vtx_count);
+		T->b = *remap.get(m->vertices[T->b].x + (N + 1) * m->vertices[T->b].y + (N + 1)*(N + 1)*m->vertices[T->b].z);
+		assert(T->b < vtx_count);
+		T->c = *remap.get(m->vertices[T->c].x + (N + 1) * m->vertices[T->c].y + (N + 1)*(N + 1)*m->vertices[T->c].z);
+		assert(T->c < vtx_count);
 	}
 
-	for(int i = 0; i < N; i++){
-		m->vertices[change[i]] = m->vertices[i];
+	for(int i = 0; i < m->vtx_count; i++){
+		int *v = remap.get(m->vertices[i].x + (N + 1) * m->vertices[i].y + (N + 1)*(N + 1)*m->vertices[i].z);
+		m->vertices[*v] = m->vertices[i];
+	}
+	
+	return vtx_count;
+}
+
+#else
+
+int dedup_mesh_vertices(struct Mesh *m)
+{
+
+	int vtx_count = 0;
+	int V = m->vtx_count;
+	int *remap = (int *)malloc(V * sizeof(int));
+	/* TODO replace that inefficient linear search ! */
+	for (int i = 0; i < V; i++) {
+		bool dup = false;
+		struct Vertex v = m->vertices[i];
+		for (int j = 0; j < i; j++) {
+			struct Vertex vv = m->vertices[j];
+			if (v.x == vv.x && v.y == vv.y && v.z == vv.z) {
+				dup = true;
+				remap[i] = remap[j];
+				break;
+			}
+		}
+		if (!dup) {
+			remap[i] = vtx_count;
+			vtx_count++;
+			printf("I set %d : %d\n", i, vtx_count-1);
+		}
+	}
+	/* Remap vertices */
+	for (int i = 0; i < m->vtx_count; i++) {
+		m->vertices[remap[i]] = m->vertices[i];
 	}
 
 	for(int i = 0; i < m->tri_count; i++){
-		struct Triangle *T = &m->triangles[i];
-		T->a = change[T->a];
-		T->b = change[T->b];
-		T->c = change[T->c];
+		printf("Triangle %d : %d %d %d\n", i, m->triangles[i].a, m->triangles[i].b, m->triangles[i].c);
 	}
 
-	free(change);
+	printf("\n\n");
 
-	return count;
-	
+	/* Remap triangle indices */
+	for (int i = 0; i < m->tri_count; i++) {
+		struct Triangle *T = &m->triangles[i];
+		printf("Triangle %d : %d %d %d\n", i, T->a, T->b, T->c);
+		T->a = remap[T->a];
+		assert(T->a < vtx_count);
+		T->b = remap[T->b];
+		assert(T->b < vtx_count);
+		T->c = remap[T->c];
+		assert(T->c < vtx_count);
+	}
+
+	for(int i = 0; i < m->tri_count;i++){
+		printf("Triangle %d : %d %d %d\n", i, m->triangles[i].a, m->triangles[i].b, m->triangles[i].c);
+	}
+
+	free(remap);
+	return vtx_count;
 }
+#endif
 
 void build_cube_mesh(struct Mesh *m, int N)
 {
-	/* Number of vertices per side = number of divisions + 1 */
+	// Number of vertices per side = number of divisions + 1 
 	int V = N + 1;
 
-	/* We allocate for 6 * V^2 vertices */
+	// We allocate for 6 * V^2 vertices 
 	int max_vert = 6 * V * V;
 	m->vertices = (struct Vertex *)malloc(max_vert * sizeof(struct Vertex));
 	m->vtx_count = 0;
 
-	/* We allocate for 12 * N^2 triangles */
+	// We allocate for 12 * N^2 triangles 
 	int tri_count = 12 * N * N;
-	m->triangles =
-	    (struct Triangle *)malloc(tri_count * sizeof(struct Triangle));
+	m->triangles = (struct Triangle *)malloc(tri_count * sizeof(struct Triangle));
 	m->tri_count = 0;
 
-	/* We fill the vertices and then the faces */
+	// We fill the vertices and then the faces 
 	m->vtx_count = build_cube_vertices(m->vertices, N);
 	m->tri_count = build_cube_triangles(m->triangles, N);
 
-	/* We fix-up vertex duplication */
+	// We fix-up vertex duplication 
 	m->vtx_count = dedup_mesh_vertices(m);
 	assert(m->vtx_count == 6 * V * V - 12 * V + 8);
 
-	/* Rescale to unit cube centered at the origin */
+	// Rescale to unit cube centered at the origin 
 
-	/*for (int i = 0; i < m->vtx_count; ++i) {
+	for (int i = 0; i < m->vtx_count; ++i) {
 		struct Vertex *v = &m->vertices[i];
 		v->x = 2 * v->x / N - 1;
 		v->y = 2 * v->y / N - 1;
 		v->z = 2 * v->z / N - 1;
-	}*/
+	}
 }
 
 /******************************************************************************
