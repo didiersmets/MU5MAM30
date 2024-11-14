@@ -5,7 +5,7 @@ SRC_DIR = src
 INC_DIR = include
 
 # Directory to use for other include files of the professor
-PROF_INC_DIR = ../include/common
+PROF_INC_DIR = ../../include/common
 
 # Compiler and compiler flags
 CXX = g++
@@ -13,22 +13,30 @@ CXXFLAGS = -Wall -g -I$(INC_DIR) -I$(PROF_INC_DIR)
 
 # Default target
 .PHONY: all
-all: $(SRC_DIR)/tp1.cpp 
+all: help
 
 # Rule for compiling a single .cpp file from the src directory
 # The $@ is the target (e.g., tp1 or test), and $< is the first dependency (the .cpp file)
-%.o: $(SRC_DIR)/%.cpp
+$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Rule for linking object files and generating the executable
 # This is for all .o files corresponding to .cpp files in the src directory
-%: %.o
+$(SRC_DIR)/%: $(SRC_DIR)/%.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-# Run the program after building it
-run-%: %
-	./$<
+# Custom target to compile a specific .cpp file
+.PHONY: compile
+compile: $(SRC_DIR)/$(FILE).cpp
+	$(MAKE) $(SRC_DIR)/$(FILE)
 
-# Clean up generated files
+# Help target to display usage information
+.PHONY: help
+help:
+	@echo "Usage: make FILE=<filename> compile"
+	@echo "Example: make FILE=tp1 compile"
+
+# Clean up build artifacts
+.PHONY: clean
 clean:
-	rm -f $(SRC_DIR)/*.o tp1 test
+	rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*

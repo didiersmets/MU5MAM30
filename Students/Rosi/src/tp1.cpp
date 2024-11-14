@@ -445,12 +445,6 @@ int dedup_mesh_vertices(struct Mesh *m)
 		m->vertices[remap[i]] = m->vertices[i];
 	}
 
-	for(int i = 0; i < m->tri_count; i++){
-		printf("Triangle %d : %d %d %d\n", i, m->triangles[i].a, m->triangles[i].b, m->triangles[i].c);
-	}
-
-	printf("\n\n");
-
 	/* Remap triangle indices */
 	for (int i = 0; i < m->tri_count; i++) {
 		struct Triangle *T = &m->triangles[i];
