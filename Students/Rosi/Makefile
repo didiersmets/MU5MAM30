@@ -1,6 +1,9 @@
 # Directory where the source files are located
 SRC_DIR = src
 
+# Directory of executables
+BUILD_DIR = build
+
 # Directory where the include files are located
 INC_DIR = include
 
@@ -17,18 +20,18 @@ all: help
 
 # Rule for compiling a single .cpp file from the src directory
 # The $@ is the target (e.g., tp1 or test), and $< is the first dependency (the .cpp file)
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Rule for linking object files and generating the executable
 # This is for all .o files corresponding to .cpp files in the src directory
-$(SRC_DIR)/%: $(SRC_DIR)/%.o
+$(BUILD_DIR)/%: $(BUILD_DIR)/%.o
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 # Custom target to compile a specific .cpp file
 .PHONY: compile
 compile: $(SRC_DIR)/$(FILE).cpp
-	$(MAKE) $(SRC_DIR)/$(FILE)
+	$(MAKE) $(BUILD_DIR)/$(FILE)
 
 # Help target to display usage information
 .PHONY: help
@@ -39,4 +42,4 @@ help:
 # Clean up build artifacts
 .PHONY: clean
 clean:
-	rm -f $(SRC_DIR)/*.o $(SRC_DIR)/*
+	rm -f $(BUILD_DIR)/* 

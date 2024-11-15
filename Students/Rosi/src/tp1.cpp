@@ -6,7 +6,9 @@
 #include <string.h>
 #include "hash_table.h"
 
-#define FAST 1
+#define FAST 0
+#define CONJ 0
+
 
 /* The goal of this TP is to get acquainted with C (not yet C++)
  * and at the same time solve the equation
@@ -73,6 +75,17 @@ struct SparseMatrix {
 	struct Coeff *coeffs;
 };
 
+struct CRSMatrix {
+	int rows;
+	int cols;
+	int nnz;
+	int *row_ptr;
+	int *col_ind;
+	double *val;
+};
+
+
+
 /* A Vector in R^3. Similar to Vertex, but as in affine geometry we may
  * wish to distinguish vectors and points.
  */
@@ -114,6 +127,18 @@ void matrix_vector_product(const struct SparseMatrix *M, const double *v,
 	return;			
 }
 
+void matrix_vector_product(const struct CRSMatrix *M, const double *v,
+			   double *Mv){
+	for(int i = 0; i < M->rows; i++) Mv[i] = 0;
+
+	for (int i = 0; i < M->rows; i++) {
+		for (int k = M->row_ptr[i]; k < M->row_ptr[i + 1]; k++) {
+			Mv[i] += M->val[k] * v[M->col_ind[k]];
+		}
+	}
+	return;			
+}
+
 /******************************************************************************
  * Builds the P1 stiffness and mass matrices of a given mesh.
  * We do not try to assemble different elements together here for simplicity.
@@ -130,6 +155,7 @@ void build_fem_matrices(const struct Mesh *m, struct SparseMatrix *S,
     
 
 	for(int t = 0; t < m->tri_count; t++){
+
         int a = m->triangles[t].a;
         int b = m->triangles[t].b;
         int c = m->triangles[t].c;
@@ -162,15 +188,80 @@ void build_fem_matrices(const struct Mesh *m, struct SparseMatrix *S,
         stiff[0] = (Coeff) {a,a,dot(BC,BC) * mult};
         stiff[1] = (Coeff) {b,b,dot(CA,CA) * mult};
         stiff[2] = (Coeff) {c,c,dot(AB,AB) * mult};
-		stiff[3] = (Coeff) {a,b,dot(BC,BC) * mult};
+		stiff[3] = (Coeff) {a,b,dot(CA,BC) * mult};
         stiff[4] = (Coeff) {b,a,dot(CA,BC) * mult};
-        stiff[5] = (Coeff) {a,c,dot(CA,BC) * mult};
+        stiff[5] = (Coeff) {a,c,dot(AB,BC) * mult};
         stiff[6] = (Coeff) {c,a,dot(AB,BC) * mult};
         stiff[7] = (Coeff) {b,c,dot(AB,CA) * mult};
         stiff[8] = (Coeff) {c,b,dot(AB,CA) * mult};
+	
 	}
 	return;
 }
+
+void build_fem_matrices(const struct Mesh *m, struct CRSMatrix *S,
+			struct CRSMatrix *M){
+	int N = m->vtx_count;
+	S->cols = S->rows = M->cols = M->rows = N;
+	S->nnz = M->nnz = 9*m->tri_count;
+	S->row_ptr = (int *) malloc(N * sizeof(int));
+	S->col_ind = (int *) malloc(S->nnz * sizeof(int));
+	S->val = (double *) malloc(S->nnz * sizeof(double));
+	M->row_ptr = (int *) malloc(N * sizeof(int));
+	M->col_ind = (int *) malloc(M->nnz * sizeof(int));
+	M->val = (double *) malloc(M->nnz * sizeof(double));
+
+	S->row_ptr[0] = 0;
+	M->row_ptr[0] = 0;
+
+	for(int t = 0; t < m->tri_count; t++){
+
+		int a = m->triangles[t].a;
+		int b = m->triangles[t].b;
+		int c = m->triangles[t].c;
+
+		struct Vertex A = m->vertices[a];
+		struct Vertex B = m->vertices[b];
+		struct Vertex C = m->vertices[c];
+
+		struct Vector AB = vector(A, B);
+		struct Vector BC = vector(B, C);
+		struct Vector CA = vector(C, A);
+
+		double area = 0.5 * norm(cross(AB, CA));
+		
+		int * mass_row = &M->row_ptr[3*t];
+		int * stiff_row = &S->row_ptr[3*t];
+
+		mass_row[0] = a;
+		mass_row[1] = b;
+		mass_row[2] = c;
+
+		stiff_row[0] = a;
+		stiff_row[1] = b;
+		stiff_row[2] = c;
+
+		double mult = 1. / (4*area);
+
+		M->val[M->row_ptr[3*t]] = area/6;
+		M->col_ind[M->row_ptr[3*t]++] = a;
+		M->val[M->row_ptr[3*t]] = area/6;
+		M->col_ind[M->row_ptr[3*t]++] = b;
+		M->val[M->row_ptr[3*t]] = area/6;
+		M->col_ind[M->row_ptr[3*t]++] = c;
+		M->val[M->row_ptr[3*t]] = area/12;
+		M->col_ind[M->row_ptr[3*t]++] = b;
+		M->val[M->row_ptr[3*t]] = area/12;
+		M->col_ind[M->row_ptr[3*t]++] = c;
+		M->val[M->row_ptr[3*t]] = area/12;
+		M->col_ind[M->row_ptr[3*t]++] = a;
+		M->val[M->row_ptr[3*t]] = area/12;
+		M->col_ind[M->row_ptr[3*t]++] = c;
+		M->val[M->row_ptr[3*t]] = area/12;
+		M->col_ind[M->row_ptr[3*t]++] = a;
+	}
+}
+	
 
 /******************************************************************************
  * Routines for elementary linear algebra in arbitrary (large) dimensions
@@ -209,34 +300,75 @@ void blas_axpby(double a, const double *X, double b, double *Y, int N){
 int gradient_system_solve(const struct SparseMatrix *S,
 			  const struct SparseMatrix *M, const double *B,
 			  double *U,double *error, int N){
+	
+	memset(U, 0, N * sizeof(double));
+
     //initial residue
+
     double *r = array(N);
+
+	memcpy(r, B, N * sizeof(double));
+	double error2 = blas_dot(r,r,N);
+
     double *Mr = array(N);
     double *Ar = array(N);
-    matrix_vector_product(S,U,r);
-    matrix_vector_product(M,U,Mr);
-    blas_axpby(1,Mr,1,r,N);
-    blas_axpby(1,B,-1,r,N);
 
+    
     int iterate = 0;
-    int iter_max = 1000;
+    //int iter_max = 1000;
     double tol = 1e-6;
     double tol2 = tol*tol;
-    double error2 = blas_dot(r,r,N);
-
-    while(error2 > tol2 && iterate < iter_max){
-
-        matrix_vector_product(S,r,Ar);
-        matrix_vector_product(M,r,Mr);
-        blas_axpby(1,Mr,1,Ar,N);
-        double alpha = error2/blas_dot(Ar,r,N);
-        //Update U
-        blas_axpby(alpha,r,1,U,N);
     
-        //Update r (note r{k+1} = r{k} - aplha*(Ar{k}))
-        blas_axpby(-alpha,Ar,1,r,N);
 
-        //Update error
+	#if CONJ == 1
+		double *p = r;
+		double *Mp = array(N);
+		double *Ap = array(N);
+
+	#endif
+
+    while(error2 > tol2){
+
+		#if CONJ == 0
+
+			matrix_vector_product(S,r,Ar);
+        	matrix_vector_product(M,r,Mr);
+        	blas_axpby(1,Mr,1,Ar,N);
+
+
+
+			double alpha = error2/blas_dot(Ar,r,N);
+	
+        	//Update U
+        	blas_axpby(alpha,r,1,U,N);
+    
+  	    	//Update r (note r{k+1} = r{k} - aplha*(Ar{k}))
+    	    blas_axpby(-alpha,Ar,1,r,N);
+
+		#else
+
+			matrix_vector_product(M,p,Mp);
+			matrix_vector_product(S,p,Ap);
+			blas_axpby(1,Mp,1,Ap,N);
+
+			double pAp = blas_dot(p,Ap,N);
+			
+			double alpha = blas_dot(p,r,N)/pAp;
+
+			blas_axpby(alpha,p,1,U,N);
+
+			blas_axpby(-alpha,Ap,1,r,N);
+
+			matrix_vector_product(S,r,Ar);
+        	matrix_vector_product(M,r,Mr);
+        	blas_axpby(1,Mr,1,Ar,N);
+
+			double beta = blas_dot(p,Ar,N)/pAp;
+
+			blas_axpby(1,r,-beta,p,N);
+			
+		#endif
+    	//Update error
         error2 = blas_dot(r,r,N);
 
         iterate++;
@@ -244,6 +376,12 @@ int gradient_system_solve(const struct SparseMatrix *S,
     free(Mr);
     free(Ar);
     free(r);
+
+	#if CONJ == 1
+		free(Mp);
+		free(Ap);
+		free(p);
+	#endif
 
     *error = sqrt(error2);
     
@@ -437,7 +575,6 @@ int dedup_mesh_vertices(struct Mesh *m)
 		if (!dup) {
 			remap[i] = vtx_count;
 			vtx_count++;
-			printf("I set %d : %d\n", i, vtx_count-1);
 		}
 	}
 	/* Remap vertices */
@@ -448,17 +585,12 @@ int dedup_mesh_vertices(struct Mesh *m)
 	/* Remap triangle indices */
 	for (int i = 0; i < m->tri_count; i++) {
 		struct Triangle *T = &m->triangles[i];
-		printf("Triangle %d : %d %d %d\n", i, T->a, T->b, T->c);
 		T->a = remap[T->a];
 		assert(T->a < vtx_count);
 		T->b = remap[T->b];
 		assert(T->b < vtx_count);
 		T->c = remap[T->c];
 		assert(T->c < vtx_count);
-	}
-
-	for(int i = 0; i < m->tri_count;i++){
-		printf("Triangle %d : %d %d %d\n", i, m->triangles[i].a, m->triangles[i].b, m->triangles[i].c);
 	}
 
 	free(remap);
