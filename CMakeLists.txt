@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.14)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+
 project(MU5MAM30 LANGUAGES CXX C)
+
+find_package(OpenGL REQUIRED)
 
 ###############################################################################
 set(USE_OPENMP FALSE)
@@ -27,7 +34,7 @@ target_include_directories(nanofem PUBLIC
 	extern
 )
 target_compile_options(nanofem PRIVATE 
-	-Wall -Wextra -ffast-math -march=native -Wno-unknown-pragmas
+	-std=c++17 -Wall -Wextra -ffast-math -march=native -Wno-unknown-pragmas
 )
 if (USE_OPENMP AND OpenMP_CXX_FOUND)
 	target_compile_options(nanofem PRIVATE -DUSE_OPENMP)
@@ -52,33 +59,33 @@ target_include_directories(nanoviewer PUBLIC
 	extern
 )
 target_compile_options(nanoviewer PRIVATE
-	-Wall -Wextra
+	-std=c++17 -Wall -Wextra
 )
 target_link_libraries(nanoviewer PUBLIC
 	glfw
 	imgui_glfw_opengl3
-	GL
+	OpenGL::GL
 )
 ###############################################################################
 
 ###############################################################################
 add_executable(test_poisson
-	src/common/logging.c
+	src/common/logging.cpp
 	src/bin/test_poisson.cpp
 )
 target_compile_options(test_poisson PRIVATE 
-	-Wall -Wextra -Wno-missing-field-initializers
+	-std=c++17 -Wall -Wextra -Wno-missing-field-initializers
 )
 target_link_libraries(test_poisson PRIVATE nanofem nanoviewer tiny_expr) 
 ###############################################################################
 
 ###############################################################################
 add_executable(test_NS
-	src/common/logging.c
+	src/common/logging.cpp
 	src/bin/test_navier_stokes.cpp
 )
 target_compile_options(test_NS PRIVATE 
-	-Wall -Wextra -Wno-missing-field-initializers
+	-std=c++17 -Wall -Wextra -Wno-missing-field-initializers
 )
 target_link_libraries(test_NS PRIVATE nanofem nanoviewer tiny_expr)
 ###############################################################################

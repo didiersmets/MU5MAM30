@@ -2,12 +2,9 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES 1
-#endif
+#include "gl_utils.h"
+
 #include "imgui/imgui.h"
-#include <GL/gl.h>
-#include <GL/glext.h>
 
 #include "tiny_expr/tinyexpr.h"
 
@@ -266,26 +263,26 @@ static void draw_scene(const Viewer &viewer, int shader,
 	Mat4 proj = camera.view_to_clip();
 	Mat4 vm = camera.world_to_view();
 	Vec3 camera_pos = camera.get_position();
-	glUniformMatrix4fv(0, 1, 0, &vm(0, 0));
-	glUniformMatrix4fv(1, 1, 0, &proj(0, 0));
-	glUniform3fv(2, 1, &camera_pos[0]);
-	glUniform1f(4, scale_min);
-	glUniform1f(5, scale_max);
-	glUniform1f(6, mesh_deform);
+	glUniformMatrix4fv(glGetUniformLocation(shader, "vm"), 1, 0, &vm(0, 0));
+	glUniformMatrix4fv(glGetUniformLocation(shader, "proj"), 1, 0, &proj(0, 0));
+	glUniform3fv(glGetUniformLocation(shader, "camera_pos"), 1, &camera_pos[0]);
+	glUniform1f(glGetUniformLocation(shader, "scale_min"), scale_min);
+	glUniform1f(glGetUniformLocation(shader, "scale_max"), scale_max);
+	glUniform1f(glGetUniformLocation(shader, "deform"), mesh_deform);
 
 	if (draw_surface) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		float offset = reversed_z ? -1.f : 1.f;
 		glPolygonOffset(offset, offset);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glUniform1i(3, true);
+		glUniform1i(glGetUniformLocation(shader, "lighting"), true);
 		gpu_mesh.draw();
 	}
 	if (draw_edges) {
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(0.f, 0.f);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glUniform1i(3, false);
+		glUniform1i(glGetUniformLocation(shader, "lighting"), false);
 		gpu_mesh.draw();
 	}
 }

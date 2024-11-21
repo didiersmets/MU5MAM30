@@ -1,8 +1,4 @@
-#ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include "gl_utils.h"
 
 #include "mesh.h"
 #include "mesh_gpu.h"
@@ -55,6 +51,8 @@ void GPUMesh::upload()
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	
+	assert(!glGetError());
 }
 
 void GPUMesh::draw() const
@@ -63,6 +61,8 @@ void GPUMesh::draw() const
 	glDrawElements(GL_TRIANGLES, m->indices.size, GL_UNSIGNED_INT,
 		       (void *)0);
 	glBindVertexArray(0);
+	
+	assert(!glGetError());
 }
 
 void GPUMesh::update_attr()
@@ -72,4 +72,6 @@ void GPUMesh::update_attr()
 		     GL_STATIC_DRAW);
 	glBufferData(GL_ARRAY_BUFFER, m->attr.size * sizeof(m->attr[0]),
 		     m->attr.data, GL_STATIC_DRAW);
+	
+	assert(!glGetError());
 }

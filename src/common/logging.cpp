@@ -52,7 +52,7 @@ void vlog_impl(const char *filename, int line, const char *fmt, va_list args)
 
 	(void)snprintf(buf, prefix_len + 1, PREFIX_FMT);
 	(void)vsnprintf(&buf[prefix_len], len + 1, fmt, args);
-	(void)sprintf(&buf[strlen(buf)], "\n");
+	(void)snprintf(&buf[strlen(buf)],2 , "\n");
 	logfunc(buf);
 	free(buf);
 }

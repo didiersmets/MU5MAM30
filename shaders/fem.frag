@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // In variables
 layout (location = 0) in vec3 _V;  /* View vector  (non normalized) */
@@ -6,9 +6,13 @@ layout (location = 1) in vec3 _L;   /* Light vector (non normalized) */
 layout (location = 2) in float u;
 
 /* Uniform variables (cell independent) */
-layout (location = 3) uniform bool lighting;
-layout (location = 4) uniform float scale_min;
-layout (location = 5) uniform float scale_max;
+uniform mat4 vm;
+uniform mat4 proj;
+uniform vec3 camera_pos;
+uniform bool lighting;
+uniform float scale_min;
+uniform float scale_max;
+uniform float deform;
 
 // Out color
 layout (location = 0) out vec4 color;

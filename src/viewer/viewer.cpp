@@ -2,11 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef GL_GLEXT_PROTOTYPES
-	#define GL_GLEXT_PROTOTYPES 1
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include "gl_utils.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
@@ -21,9 +17,11 @@
 
 #define ZOOM_SENSITIVITY 0.3f /* for mouse zoom */
 
+#ifndef __APPLE__
 static void GL_debug_cb(GLenum source, GLenum type, GLuint id, GLenum severity,
 			GLsizei length, const GLchar *message,
 			const void *user_param);
+#endif
 static void mouse_button_cb(GLFWwindow *window, int button, int action,
 			    int mods);
 static void cursor_pos_cb(GLFWwindow *window, double x, double y);
@@ -46,7 +44,7 @@ void Viewer::init(const char *name)
 	}
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
 	glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -66,11 +64,13 @@ void Viewer::init(const char *name)
 	glfwSwapInterval(1);
 
 	/* Allow OpenGL debug messages */
+#ifndef __APPLE__
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(GL_debug_cb, NULL);
-
+#endif
 	/* Set-up OpenGL for our choice of NDC */
 	set_up_opengl_for_ndc();
+
 
 	/* Set-up Imgui */
 	IMGUI_CHECKVERSION();
@@ -112,6 +112,7 @@ void Viewer::fini()
 	glfwTerminate();
 }
 
+#ifndef __APPLE__
 static void GL_debug_cb(GLenum source, GLenum type, GLuint id, GLenum severity,
 			GLsizei length, const GLchar *message,
 			const void *user_param)
@@ -127,6 +128,7 @@ static void GL_debug_cb(GLenum source, GLenum type, GLuint id, GLenum severity,
 		       type, severity, message);
 	}
 }
+#endif
 
 static void mouse_button_cb(GLFWwindow *window, int button, int action,
 			    int mods)

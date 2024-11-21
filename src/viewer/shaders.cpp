@@ -2,11 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include "gl_utils.h"
 
 GLuint create_shader(const char *vs_path, const char *fs_path)
 {
@@ -67,7 +63,7 @@ GLuint create_shader(const char *vs_path, const char *fs_path)
 	glLinkProgram(prg);
 	glGetProgramiv(prg, GL_LINK_STATUS, &success);
 	if (!success) {
-		glGetShaderInfoLog(frag, 512, NULL, infoLog);
+		glGetProgramInfoLog(prg, 512, NULL, infoLog);
 		printf("ERROR: linking failed !\n%s\n", infoLog);
 		return 0;
 	}
