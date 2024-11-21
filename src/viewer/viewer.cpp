@@ -33,9 +33,6 @@ static void resize_window_cb(GLFWwindow *window, int width, int height);
 void Viewer::init(const char *name)
 {
 	this->name = name;
-	width = 1920;
-	height = 1080;
-	camera.set_aspect((float)width / height);
 
 	/* Set-up GLFW and */
 	if (!glfwInit()) {
@@ -49,11 +46,13 @@ void Viewer::init(const char *name)
 	glfwWindowHint(GLFW_DEPTH_BITS, 32);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, 4);
-	window = glfwCreateWindow(width, height, name, NULL, NULL);
+	window = glfwCreateWindow(1920, 1080, name, NULL, NULL);
 	if (!window) {
 		printf("Cannot create GLFW window.\n");
 		exit(EXIT_FAILURE);
 	}
+	glfwGetWindowSize(window, &width, &height);
+	camera.set_aspect((float)width / height);
 	glfwSetWindowUserPointer(window, this);
 	glfwMakeContextCurrent(window);
 	glfwSetKeyCallback(window, key_cb);
@@ -251,10 +250,8 @@ static void resize_window_cb(GLFWwindow *window, int width, int height)
 {
 	Viewer *viewer = (Viewer *)glfwGetWindowUserPointer(window);
 
-	viewer->width = width;
-	viewer->height = height;
+	glfwGetWindowSize(window, &viewer->width, &viewer->height);
 	viewer->camera.set_aspect((float)width / height);
-
 	glViewport(0, 0, width, height);
 }
 
