@@ -31,6 +31,7 @@ template <typename T> struct TArray {
 	void push_back(const T &t);
 	void resize(size_t size);
 	void reserve(size_t capacity);
+	void shrink_to_fit();
 	void clear();
 };
 
@@ -106,6 +107,14 @@ template <typename T> void TArray<T>::reserve(size_t capacity)
 		data = static_cast<T *>(
 			safe_realloc(data, capacity * sizeof(T)));
 		this->capacity = capacity;
+	}
+}
+
+template <typename T> void TArray<T>::shrink_to_fit()
+{
+	if (capacity > size) {
+		data = static_cast<T *>(safe_realloc(data, size * sizeof(T)));
+		this->capacity = size;
 	}
 }
 

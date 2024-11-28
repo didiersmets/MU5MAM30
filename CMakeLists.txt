@@ -15,11 +15,13 @@ if (USE_OPENMP)
 	find_package(OpenMP)
 endif()
 add_library(nanofem
+	src/mesh/adjacency.cpp
 	src/mesh/cube.cpp
 	src/mesh/sphere.cpp
 	src/mesh/duplicate_verts.cpp
 	src/mesh/mesh_io.cpp
 	src/mesh/mesh_bounds.cpp
+	src/linalg/sparse_matrix.cpp
 	src/linalg/conjugate_gradient.cpp
 	src/fem/fem_matrix.cpp
 	src/fem/P1.cpp

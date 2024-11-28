@@ -35,4 +35,5 @@ VTAdjacency::VTAdjacency(const Mesh &m)
 	for (size_t v = 0; v < vtx_count; ++v) {
 		offset[v] -= degree[v];
 	}
+	assert(offset[vtx_count - 1] + degree[vtx_count - 1] == idx_count);
 }

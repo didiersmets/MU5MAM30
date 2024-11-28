@@ -3,7 +3,11 @@
 #include "P1.h"
 #include "array.h"
 #include "conjugate_gradient.h"
+#if USE_FEM_MATRIX
 #include "fem_matrix.h"
+#else
+#include "sparse_matrix.h"
+#endif
 #include "mesh.h"
 #include "tiny_blas.h"
 
@@ -16,8 +20,9 @@ PoissonSolver::PoissonSolver(const Mesh &m)
 	, p(N)
 	, Ap(N)
 {
-	build_P1_mass_matrix(m, M);
-	build_P1_stiffness_matrix(m, A);
+	build_P1_CSRPattern(m, P);
+	build_P1_mass_matrix(m, P, M);
+	build_P1_stiffness_matrix(m, P, A);
 	vol = M.sum();
 	inited = false;
 	iterate = 0;
