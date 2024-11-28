@@ -2,14 +2,14 @@
 #include <string.h>
 
 #ifdef USE_OPENMP
-#include <omp.h>
+	#include <omp.h>
 #endif
 
 #include "P1.h"
-#include "fem_matrix.h"
-#include "sparse_matrix.h"
-#include "mesh.h"
 #include "adjacency.h"
+#include "fem_matrix.h"
+#include "mesh.h"
+#include "sparse_matrix.h"
 
 void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
 {
@@ -20,13 +20,13 @@ void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
 	const TArray<uint32_t> &idx = A.m->indices;
 
 #ifdef USE_OPENMP
-#pragma omp parallel for
+	#pragma omp parallel for
 #endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		y[v] = A.diag[v] * x[v];
 	}
 
-	//#pragma omp parallel for
+	// #pragma omp parallel for
 	for (size_t t = 0; t < tri_count; ++t) {
 		uint32_t a = idx[3 * t + 0];
 		uint32_t b = idx[3 * t + 1];
@@ -50,7 +50,7 @@ double sum_P1_cst(const FEMatrix &A)
 
 	double sum1 = 0.0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum1)
+	#pragma omp parallel for reduction(+ : sum1)
 #endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
@@ -58,7 +58,7 @@ double sum_P1_cst(const FEMatrix &A)
 
 	double sum2 = 0.0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum2)
+	#pragma omp parallel for reduction(+ : sum2)
 #endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += 6 * A.off_diag[t];
@@ -76,13 +76,13 @@ void mvp_P1_sym(const FEMatrix &A, const double *x, double *y)
 	const TArray<uint32_t> &idx = A.m->indices;
 
 #ifdef USE_OPENMP
-#pragma omp parallel for
+	#pragma omp parallel for
 #endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		y[v] = A.diag[v] * x[v];
 	}
 
-	//#pragma omp parallel for
+	// #pragma omp parallel for
 	for (size_t t = 0; t < tri_count; ++t) {
 		uint32_t a = idx[3 * t + 0];
 		uint32_t b = idx[3 * t + 1];
@@ -105,7 +105,7 @@ double sum_P1_sym(const FEMatrix &A)
 
 	double sum1 = 0.0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum1)
+	#pragma omp parallel for reduction(+ : sum1)
 #endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
@@ -113,7 +113,7 @@ double sum_P1_sym(const FEMatrix &A)
 
 	double sum2 = 0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum2)
+	#pragma omp parallel for reduction(+ : sum2)
 #endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += 2 * A.off_diag[3 * t + 0];
@@ -158,7 +158,7 @@ double sum_P1_gen(const FEMatrix &A)
 
 	double sum1 = 0.0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum1)
+	#pragma omp parallel for reduction(+ : sum1)
 #endif
 	for (size_t v = 0; v < vtx_count; ++v) {
 		sum1 += A.diag[v];
@@ -166,7 +166,7 @@ double sum_P1_gen(const FEMatrix &A)
 
 	double sum2 = 0.0;
 #ifdef USE_OPENMP
-#pragma omp parallel for reduction(+ : sum2)
+	#pragma omp parallel for reduction(+ : sum2)
 #endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += A.off_diag[6 * t + 0];
@@ -233,7 +233,7 @@ void build_P1_CSRPattern(const Mesh &m, CSRPattern &P)
 		uint32_t *to_sort = &P.col[P.row_start[a]];
 		size_t count = P.row_start[a + 1] - P.row_start[a];
 		/* Insertion sort */
-		for (size_t k = 1; k <= count; ++k) {
+		for (size_t k = 1; k < count; ++k) {
 			size_t j = k - 1;
 			while (j && (to_sort[j] > to_sort[j + 1])) {
 				uint32_t tmp = to_sort[j];
@@ -269,12 +269,12 @@ void build_P1_mass_matrix(const Mesh &m, FEMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M.diag[a] += Mloc[0];
@@ -290,6 +290,7 @@ void build_P1_mass_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &M)
 	size_t tri_count = m.triangle_count();
 	assert(P.row_start.size == vtx_count + 1);
 
+	M.symmetric = true;
 	M.rows = M.cols = vtx_count;
 	M.nnz = P.col.size;
 	M.row_start = P.row_start.data;
@@ -307,12 +308,12 @@ void build_P1_mass_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M(a, a) += Mloc[0];
@@ -345,12 +346,12 @@ void build_P1_stiffness_matrix(const Mesh &m, FEMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S.diag[a] += Sloc[0];
@@ -368,6 +369,7 @@ void build_P1_stiffness_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &S)
 	size_t tri_count = m.triangle_count();
 	assert(P.row_start.size == vtx_count + 1);
 
+	S.symmetric = true;
 	S.rows = S.cols = vtx_count;
 	S.nnz = P.col.size;
 	S.row_start = P.row_start.data;
@@ -385,12 +387,12 @@ void build_P1_stiffness_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S(a, a) += Sloc[0];

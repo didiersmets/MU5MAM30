@@ -60,7 +60,7 @@ void Viewer::init(const char *name)
 	glfwSetCursorPosCallback(window, cursor_pos_cb);
 	glfwSetMouseButtonCallback(window, mouse_button_cb);
 	glfwSetScrollCallback(window, scroll_cb);
-	glfwSwapInterval(1);
+	glfwSwapInterval(0);
 
 	/* Allow OpenGL debug messages */
 #ifndef __APPLE__
@@ -69,7 +69,6 @@ void Viewer::init(const char *name)
 #endif
 	/* Set-up OpenGL for our choice of NDC */
 	set_up_opengl_for_ndc();
-
 
 	/* Set-up Imgui */
 	IMGUI_CHECKVERSION();

@@ -11,8 +11,14 @@
 NavierStokesSolver::NavierStokesSolver(const Mesh &m)
     : m(m), N(m.vertex_count()), omega(N), Momega(N), psi(N), r(N), p(N), Ap(N)
 {
+#if USE_FEM_MATRIX
 	build_P1_mass_matrix(m, M);
 	build_P1_stiffness_matrix(m, S);
+#else
+	build_P1_CSRPattern(m, P);
+	build_P1_mass_matrix(m, P, M);
+	build_P1_stiffness_matrix(m, P, S);
+#endif
 	vol = M.sum();
 	inited = false;
 	t = 0;

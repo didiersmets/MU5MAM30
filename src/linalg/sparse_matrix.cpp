@@ -43,12 +43,13 @@ double CSRMatrix::sum() const
 {
 	double res = 0.0;
 	for (size_t k = 0; k < nnz; k++) {
-		res += col[k];
+		res += data[k];
 	}
 	if (symmetric) {
 		res *= 2;
 		for (size_t k = 0; k < rows; k++) {
-			res -= col[row_start[k + 1] - 1];
+			assert(col[row_start[k + 1] - 1] == k);
+			res -= data[row_start[k + 1] - 1];
 		}
 	}
 	return res;
