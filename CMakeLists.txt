@@ -23,6 +23,7 @@ add_library(nanofem
 	src/mesh/mesh_bounds.cpp
 	src/linalg/sparse_matrix.cpp
 	src/linalg/conjugate_gradient.cpp
+	src/linalg/cholesky.cpp
 	src/fem/fem_matrix.cpp
 	src/fem/P1.cpp
 	src/fem/poisson.cpp

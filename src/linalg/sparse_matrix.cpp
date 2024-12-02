@@ -1,5 +1,7 @@
 #include "sparse_matrix.h"
 
+/* CSRMatrix */
+
 double &CSRMatrix::operator()(uint32_t i, uint32_t j)
 {
 	static double dummy = 0.0;
@@ -54,3 +56,44 @@ double CSRMatrix::sum() const
 	}
 	return res;
 }
+
+/* SKLMatrix */
+
+double &SKLMatrix::operator()(uint32_t i, uint32_t j)
+{
+	assert(i < rows);
+	assert(j <= i);
+	return data[row_start[i] + (j - jmin[i])];
+}
+
+void SKLMatrix::fwd_substitution(double *__restrict x,
+				 const double *__restrict b) const
+{
+	const double *__restrict d = &data[0];
+	for (uint32_t i = 0; i < rows; ++i) {
+		x[i] = b[i];
+		uint32_t j0 = jmin[i];
+		for (uint32_t j = j0; j < i; j++) {
+			x[i] -= *(d++) * x[j];
+		}
+		x[i] /= *(d++);
+	}
+}
+
+void SKLMatrix::bwd_substitution(double *__restrict x,
+				 const double *__restrict b) const
+{
+	for (uint32_t i = 0; i < rows; ++i) {
+		x[i] = b[i];
+	}
+	const double *__restrict d = &data[nnz - 1];
+	uint32_t i = rows;
+	while (i-- > 0) {
+		uint32_t j0 = jmin[i];
+		x[i] /= *(d--);
+		for (uint32_t j = i - 1; j >= j0; j--) {
+			x[j] -= *(d--) * x[i];
+		}
+	}
+}
+
