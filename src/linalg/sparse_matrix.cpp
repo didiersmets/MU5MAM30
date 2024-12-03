@@ -23,7 +23,7 @@ void CSRMatrix::mvp(const double *__restrict x, double *__restrict y) const
 		y[i] = 0;
 		size_t start = row_start[i];
 		size_t stop = row_start[i + 1];
-		for (uint32_t k = start; k < stop; ++k) {
+		for (size_t k = start; k < stop; ++k) {
 			assert(k < nnz);
 			assert(col[k] < cols);
 			y[i] += data[k] * x[col[k]];
@@ -34,7 +34,7 @@ void CSRMatrix::mvp(const double *__restrict x, double *__restrict y) const
 			size_t start = row_start[i];
 			/* stop before the diagonal */
 			size_t stop = row_start[i + 1] - 1;
-			for (uint32_t k = start; k < stop; ++k) {
+			for (size_t k = start; k < stop; ++k) {
 				y[col[k]] += data[k] * x[i];
 			}
 		}
@@ -63,6 +63,8 @@ double &SKLMatrix::operator()(uint32_t i, uint32_t j)
 {
 	assert(i < rows);
 	assert(j <= i);
+	assert(j >= jmin[i]);
+	assert(row_start[i] + (j - jmin[i]) < row_start[i + 1]);
 	return data[row_start[i] + (j - jmin[i])];
 }
 
@@ -95,5 +97,42 @@ void SKLMatrix::bwd_substitution(double *__restrict x,
 			x[j] -= *(d--) * x[i];
 		}
 	}
+}
+
+void SKLMatrix::mvp(const double *__restrict x, double *__restrict y) const
+{
+	for (size_t i = 0; i < rows; ++i) {
+		y[i] = 0;
+		size_t off = row_start[i] - jmin[i];
+		uint32_t jstart = jmin[i];
+		for (size_t j = jstart; j <= i; ++j) {
+			y[i] += data[off + j] * x[j];
+		}
+	}
+	if (symmetric) {
+		for (size_t i = 0; i < rows; ++i) {
+			uint32_t jstart = jmin[i];
+			size_t off = row_start[i] - jstart;
+			/* stop before the diagonal */
+			for (uint32_t j = jstart; j < i; ++j) {
+				y[j] += data[off + j] * x[i];
+			}
+		}
+	}
+}
+
+double SKLMatrix::sum() const
+{
+	double res = 0.0;
+	for (size_t k = 0; k < nnz; k++) {
+		res += data[k];
+	}
+	if (symmetric) {
+		res *= 2;
+		for (size_t k = 0; k < rows; k++) {
+			res -= data[row_start[k + 1] - 1];
+		}
+	}
+	return res;
 }
 

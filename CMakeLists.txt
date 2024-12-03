@@ -94,6 +94,17 @@ target_link_libraries(test_NS PRIVATE nanofem nanoviewer tiny_expr)
 ###############################################################################
 
 ###############################################################################
+add_executable(test_Cholesky
+	src/common/logging.cpp
+	src/bin/test_cholesky.cpp
+)
+target_compile_options(test_Cholesky PRIVATE 
+	-std=c++17 -Wall -Wextra -Wno-missing-field-initializers
+)
+target_link_libraries(test_Cholesky PRIVATE nanofem)
+###############################################################################
+
+###############################################################################
 add_library(imgui_glfw_opengl3
 	extern/imgui/imgui.cpp
 	extern/imgui/imgui_draw.cpp

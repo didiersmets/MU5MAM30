@@ -31,8 +31,10 @@ struct SKLPattern {
 	TArray<uint32_t> jmin; /* Size = nrows */
 };
 
-/* Skyline Lower triangular matrix */
+/* Skyline sparse matrix, lower triangular or symmetric
+ * In both cases, the entries above the diagonal are not recorded. */
 struct SKLMatrix : public Matrix {
+	bool symmetric;
 	size_t nnz; /* Number of (non zero) entries */
 	// Non zero entries on line i (0 <= i < rows) are stored at indices
 	// row_start(i) <= k < row_start(i + 1).
@@ -40,6 +42,8 @@ struct SKLMatrix : public Matrix {
 	size_t *row_start;
 	uint32_t *jmin;
 	TArray<double> data; /* Size = nnz */
+	void mvp(const double *__restrict x, double *__restrict y) const;
+	double sum() const;
 	double &operator()(uint32_t i, uint32_t j);
 	void fwd_substitution(double *__restrict x,
 			      const double *__restrict b) const;

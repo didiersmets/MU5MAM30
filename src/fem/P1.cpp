@@ -275,11 +275,53 @@ void build_P1_SKLPattern(const Mesh &m, SKLPattern &P)
 	P.row_start[vtx_count] = start;
 }
 
+void build_P1_mass_matrix(const Mesh &m, const SKLPattern &P, SKLMatrix &M)
+{
+	size_t vtx_count = m.vertex_count();
+	size_t tri_count = m.triangle_count();
+	assert(P.row_start.size == vtx_count + 1);
+
+	M.symmetric = true;
+	M.rows = M.cols = vtx_count;
+	M.nnz = P.row_start[vtx_count];
+	M.row_start = P.row_start.data;
+	M.jmin = P.jmin.data;
+	M.data.resize(M.nnz);
+	for (size_t i = 0; i < M.nnz; ++i) {
+		M.data[i] = 0.0;
+	}
+
+	const TArray<uint32_t> &idx = m.indices;
+	for (size_t t = 0; t < tri_count; ++t) {
+		uint32_t a = idx[3 * t + 0];
+		uint32_t b = idx[3 * t + 1];
+		uint32_t c = idx[3 * t + 2];
+		Vec3f A = m.positions[a];
+		Vec3f B = m.positions[b];
+		Vec3f C = m.positions[c];
+		Vec3d AB = { (double)B[0] - (double)A[0],
+			     (double)B[1] - (double)A[1],
+			     (double)B[2] - (double)A[2] };
+		Vec3d AC = { (double)C[0] - (double)A[0],
+			     (double)C[1] - (double)A[1],
+			     (double)C[2] - (double)A[2] };
+		double Mloc[2];
+		mass(AB, AC, Mloc);
+		M(a, a) += Mloc[0];
+		M(b, b) += Mloc[0];
+		M(c, c) += Mloc[0];
+		M(a > b ? a : b, a > b ? b : a) += Mloc[1];
+		M(b > c ? b : c, b > c ? c : b) += Mloc[1];
+		M(c > a ? c : a, c > a ? a : c) += Mloc[1];
+	}
+}
+
 void build_P1_stiffness_matrix(const Mesh &m, const SKLPattern &P, SKLMatrix &S)
 {
 	size_t vtx_count = m.vertex_count();
 	size_t tri_count = m.triangle_count();
 
+	S.symmetric = true;
 	S.rows = S.cols = vtx_count;
 	S.nnz = P.row_start[vtx_count];
 	S.row_start = P.row_start.data;
