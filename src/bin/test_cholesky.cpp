@@ -7,6 +7,7 @@
 #include "cholesky.h"
 #include "mesh.h"
 #include "sphere.h"
+#include "chrono.h"
 
 static double test_f(Vec3 pos)
 {
@@ -37,21 +38,38 @@ int main(int argc, char **argv)
 	if (res)
 		exit(0);
 	LOG_MSG("Loaded mesh.");
-	LOG_MSG("Vertices : %zu. Triangles : %zu\n", m.vertex_count(),
+	LOG_MSG("Vertices : %zu. Triangles : %zu", m.vertex_count(),
 		m.triangle_count());
 
 	TArray<double> f(m.vertex_count());
-	TArray<double> u(m.vertex_count(), 0.0);
-
+	TArray<double> u(m.vertex_count());
+	TArray<double> tmp(m.vertex_count());
 	fill_rhs(m, f);
 
 	SKLPattern P;
 	SKLMatrix S;
 	build_P1_SKLPattern(m, P);
 	build_P1_stiffness_matrix(m, P, S);
-	LOG_MSG("SKL stiffness matrix filled. NNz : %zu", S.nnz);
+	LOG_MSG("SKL stiffness matrix filled. NNz : %zu (%.1f * DOF^(3/2))",
+		S.nnz, double(S.nnz) / pow(m.vertex_count(), 1.5));
 	in_place_cholesky_decomposition(S);
+	size_t rnnz = 0;
+	for (size_t i = 0; i < S.nnz; ++i) {
+		rnnz += (S.data[i] == 0 ? 0 : 1);
+	}
+	LOG_MSG("Actual NNZ : %zu", rnnz);
 	LOG_MSG("Cholesky decomposition performed.");
+
+	Timer chrono;
+	chrono.start();
+	S.fwd_substitution(tmp.data, f.data);
+	chrono.stop("Fwd");
+	chrono.start();
+	S.bwd_substitution(u.data, tmp.data);
+	chrono.stop("Bwd");
+	chrono.start();
+	cholesky_solve(S, f.data, u.data, tmp.data);
+	chrono.stop("Cholesky solve");
 
 	return (0);
 }

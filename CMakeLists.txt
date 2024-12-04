@@ -96,6 +96,7 @@ target_link_libraries(test_NS PRIVATE nanofem nanoviewer tiny_expr)
 ###############################################################################
 add_executable(test_Cholesky
 	src/common/logging.cpp
+	src/common/chrono.cpp
 	src/bin/test_cholesky.cpp
 )
 target_compile_options(test_Cholesky PRIVATE 

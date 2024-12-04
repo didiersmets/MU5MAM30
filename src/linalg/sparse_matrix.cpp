@@ -91,9 +91,9 @@ void SKLMatrix::bwd_substitution(double *__restrict x,
 	const double *__restrict d = &data[nnz - 1];
 	uint32_t i = rows;
 	while (i-- > 0) {
-		uint32_t j0 = jmin[i];
+		int j0 = jmin[i];
 		x[i] /= *(d--);
-		for (uint32_t j = i - 1; j >= j0; j--) {
+		for (int j = i - 1; j >= j0; j--) {
 			x[j] -= *(d--) * x[i];
 		}
 	}
