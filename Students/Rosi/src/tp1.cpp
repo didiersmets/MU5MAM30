@@ -8,6 +8,7 @@
 
 #define FAST 0
 #define CONJ 0
+#define CRSMATRIX 1
 
 
 /* The goal of this TP is to get acquainted with C (not yet C++)
@@ -131,9 +132,9 @@ void matrix_vector_product(const struct CRSMatrix *M, const double *v,
 			   double *Mv){
 	for(int i = 0; i < M->rows; i++) Mv[i] = 0;
 
-	for (int i = 0; i < M->rows; i++) {
-		for (int k = M->row_ptr[i]; k < M->row_ptr[i + 1]; k++) {
-			Mv[i] += M->val[k] * v[M->col_ind[k]];
+	for (int i = 1; i < M->rows; i++) {
+		for (int k = M->row_ptr[i - 1]; k < M->row_ptr[i]; k++) {
+			Mv[i - 1] += M->val[k] * v[M->col_ind[k]];
 		}
 	}
 	return;			
@@ -201,18 +202,94 @@ void build_fem_matrices(const struct Mesh *m, struct SparseMatrix *S,
 
 void build_fem_matrices(const struct Mesh *m, struct CRSMatrix *S,
 			struct CRSMatrix *M){
+	
 	int N = m->vtx_count;
 	S->cols = S->rows = M->cols = M->rows = N;
-	S->nnz = M->nnz = 9*m->tri_count;
-	S->row_ptr = (int *) malloc(N * sizeof(int));
-	S->col_ind = (int *) malloc(S->nnz * sizeof(int));
-	S->val = (double *) malloc(S->nnz * sizeof(double));
-	M->row_ptr = (int *) malloc(N * sizeof(int));
-	M->col_ind = (int *) malloc(M->nnz * sizeof(int));
-	M->val = (double *) malloc(M->nnz * sizeof(double));
+
+	S->nnz = 9*m->tri_count;
+
+	S->row_ptr = (int *) malloc((N + 1) * sizeof(int));
+	M->row_ptr = (int *) malloc((N + 1) * sizeof(int));
+
+	for (int i = 0; i < N + 1; i++) {
+		S->row_ptr[i] = 1;
+		M->row_ptr[i] = 1;
+	}
+
+	for(int t = 0; t < m->tri_count; t++){
+		S->row_ptr[m->triangles[t].a]++;
+		S->row_ptr[m->triangles[t].b]++;
+		S->row_ptr[m->triangles[t].c]++;
+		M->row_ptr[m->triangles[t].a]++;
+		M->row_ptr[m->triangles[t].b]++;
+		M->row_ptr[m->triangles[t].c]++;
+	}
+
+	for(int i = 0; i < N; i++){
+		S->row_ptr[i + 1] += S->row_ptr[i];
+		M->row_ptr[i + 1] += M->row_ptr[i];
+	}
+
+
+	for(int i = N-1; i >= 0; i--){
+		S->row_ptr[i + 1] = S->row_ptr[i];
+		M->row_ptr[i + 1] = M->row_ptr[i];
+	}
 
 	S->row_ptr[0] = 0;
 	M->row_ptr[0] = 0;
+
+	S->nnz = S->row_ptr[N];
+	M->nnz = M->row_ptr[N];
+
+	//filling the matrices
+
+	S->val = (double *) malloc(S->nnz * sizeof(double));
+	S->col_ind = (int *) malloc(S->nnz * sizeof(int));
+	M->val = (double *) malloc(M->nnz * sizeof(double));
+	M->col_ind = (int *) malloc(M->nnz * sizeof(int));
+
+	for(int i = 0; i < S->nnz; i++){
+		S->col_ind[i] = -1;
+		M->col_ind[i] = -1;
+	}
+	
+	
+
+	for(int t = 0; t < m->tri_count; t++){
+
+		int a = m->triangles[t].a;
+		int b = m->triangles[t].b;
+		int c = m->triangles[t].c;
+		int tria[3] = {a,b,c};
+
+		for (int k = 0; k < 3; k++) {
+            int current_vtx = tria[k];
+            for (int j = 0; j < 3; j++) {
+                int current_row = tria[j];
+                int offset = S->row_ptr[current_row];
+                int length = S->row_ptr[current_row + 1] - offset;
+
+                for (int i = 0; i < length; i++) {
+                    if (S->col_ind[offset + i] == current_vtx) {
+                        break; // Already appeared, skip
+                    } else if (S->col_ind[offset + i] == -1) { // First appearance, insert
+                        S->col_ind[offset + i] = current_vtx;
+                        break;
+                    }
+                }
+			}
+		}
+
+		for (int row = 0; row < S->rows; row++) {
+    	    int offset = S->row_ptr[row];
+    	    int length = S->row_ptr[row + 1] - offset;
+    	    qsort(&S->col_ind[offset], length, sizeof(int), [](const void *a, const void *b) {
+		        return *(int *)a - *(int *)b;
+		    });
+    	}
+
+	}
 
 	for(int t = 0; t < m->tri_count; t++){
 
@@ -229,36 +306,50 @@ void build_fem_matrices(const struct Mesh *m, struct CRSMatrix *S,
 		struct Vector CA = vector(C, A);
 
 		double area = 0.5 * norm(cross(AB, CA));
-		
-		int * mass_row = &M->row_ptr[3*t];
-		int * stiff_row = &S->row_ptr[3*t];
-
-		mass_row[0] = a;
-		mass_row[1] = b;
-		mass_row[2] = c;
-
-		stiff_row[0] = a;
-		stiff_row[1] = b;
-		stiff_row[2] = c;
 
 		double mult = 1. / (4*area);
 
-		M->val[M->row_ptr[3*t]] = area/6;
-		M->col_ind[M->row_ptr[3*t]++] = a;
-		M->val[M->row_ptr[3*t]] = area/6;
-		M->col_ind[M->row_ptr[3*t]++] = b;
-		M->val[M->row_ptr[3*t]] = area/6;
-		M->col_ind[M->row_ptr[3*t]++] = c;
-		M->val[M->row_ptr[3*t]] = area/12;
-		M->col_ind[M->row_ptr[3*t]++] = b;
-		M->val[M->row_ptr[3*t]] = area/12;
-		M->col_ind[M->row_ptr[3*t]++] = c;
-		M->val[M->row_ptr[3*t]] = area/12;
-		M->col_ind[M->row_ptr[3*t]++] = a;
-		M->val[M->row_ptr[3*t]] = area/12;
-		M->col_ind[M->row_ptr[3*t]++] = c;
-		M->val[M->row_ptr[3*t]] = area/12;
-		M->col_ind[M->row_ptr[3*t]++] = a;
+		int tria[3] = {a,b,c};
+
+		for(int i = 0; i < 3; i++){
+			int current_row = tria[i];
+			int offset = M->row_ptr[current_row];
+			int length = M->row_ptr[current_row + 1] - offset;
+			for(int k = 0; k < length; k++){
+				int col = M->col_ind[offset + k];
+				int j = -1;
+				if(col == a)
+					j = 0;
+				else if(col == b)
+					j = 1;
+				else if(col == c)
+					j = 2;
+				else
+					j = -1;
+				if(j != -1){
+					M->val[offset + k] += area/12 * (j == i ? 2 : 1);
+					if(i == 0 && j == 0)
+						S->val[offset + k] += dot(BC,BC) * mult;
+					else if(i == 1 && j == 1)
+						S->val[offset + k] += dot(CA,CA) * mult;
+					else if(i == 2 && j == 2)
+						S->val[offset + k] += dot(AB,AB) * mult;
+					else if(i == 0 && j == 1)
+						S->val[offset + k] += dot(CA,BC) * mult;
+					else if(i == 0 && j == 2)
+						S->val[offset + k] += dot(AB,BC) * mult;
+					else if(i == 1 && j == 0)
+						S->val[offset + k] += dot(CA,BC) * mult;
+					else if(i == 1 && j == 2)
+						S->val[offset + k] += dot(AB,CA) * mult;
+					else if(i == 2 && j == 0)
+						S->val[offset + k] += dot(AB,BC) * mult;
+					else if(i == 2 && j == 1)
+						S->val[offset + k] += dot(AB,CA) * mult;
+				}
+	
+			}
+		}
 	}
 }
 	
@@ -389,6 +480,97 @@ int gradient_system_solve(const struct SparseMatrix *S,
 
 }
 
+int gradient_system_solve(const struct CRSMatrix *S,
+			  const struct CRSMatrix *M, const double *B,
+			  double *U,double *error, int N){
+	
+	memset(U, 0, N * sizeof(double));
+
+	//initial residue
+
+	double *r = array(N);
+
+	memcpy(r, B, N * sizeof(double));
+	double error2 = blas_dot(r,r,N);
+
+	double *Mr = array(N);
+	double *Ar = array(N);
+
+	
+	int iterate = 0;
+	//int iter_max = 1000;
+	double tol = 1e-6;
+	double tol2 = tol*tol;
+	
+
+	#if CONJ == 1
+		double *p = r;
+		double *Mp = array(N);
+		double *Ap = array(N);
+
+	#endif
+
+	while(error2 > tol2){
+
+		
+
+		#if CONJ == 0
+
+			matrix_vector_product(S,r,Ar);
+			matrix_vector_product(M,r,Mr);
+			blas_axpby(1,Mr,1,Ar,N);
+
+			double alpha = error2/blas_dot(Ar,r,N);
+	
+        	//Update U
+        	blas_axpby(alpha,r,1,U,N);
+    
+  	    	//Update r (note r{k+1} = r{k} - aplha*(Ar{k}))
+    	    blas_axpby(-alpha,Ar,1,r,N);
+
+		#else
+
+			matrix_vector_product(M,p,Mp);
+			matrix_vector_product(S,p,Ap);
+			blas_axpby(1,Mp,1,Ap,N);
+
+			double pAp = blas_dot(p,Ap,N);
+			
+			double alpha = blas_dot(p,r,N)/pAp;
+
+			blas_axpby(alpha,p,1,U,N);
+
+			blas_axpby(-alpha,Ap,1,r,N);
+
+			matrix_vector_product(S,r,Ar);
+        	matrix_vector_product(M,r,Mr);
+        	blas_axpby(1,Mr,1,Ar,N);
+
+			double beta = blas_dot(p,Ar,N)/pAp;
+
+			blas_axpby(1,r,-beta,p,N);
+			
+		#endif
+    	//Update error
+        error2 = blas_dot(r,r,N);
+
+        iterate++;
+    }
+    free(Mr);
+    free(Ar);
+    free(r);
+
+	#if CONJ == 1
+		free(Mp);
+		free(Ap);
+		free(p);
+	#endif
+
+    *error = sqrt(error2);
+    
+    return iterate;
+
+}
 /******************************************************************************
  * Let's choose our right hand side f of -\Delta u + u = f
  *****************************************************************************/
@@ -418,9 +600,37 @@ int main(int argc, char **argv)
 	int N = m.vtx_count;
 	printf("Number of DOF : %d\n", N);
 
-	struct SparseMatrix M;
-	struct SparseMatrix S;
-	build_fem_matrices(&m, &S, &M);
+	
+
+		struct SparseMatrix M;
+		struct SparseMatrix S;
+		build_fem_matrices(&m, &S, &M);
+
+		struct SparseMatrix M1;
+		struct SparseMatrix S1;
+		build_fem_matrices(&m, &S1, &M1);
+
+		//print of S1 matrix
+		for(int i = 0; i < S1.nnz; i++){
+			printf("S1[%d][%d] = %f\n", S1.coeffs[i].i, S1.coeffs[i].j, S1.coeffs[i].val);
+		}
+	
+ 
+	
+		struct CRSMatrix M2;
+		struct CRSMatrix S2;
+		build_fem_matrices(&m, &S2, &M2);
+
+		//print of S2 matrix
+		for(int i = 1; i < S2.rows;i++){
+			for(int j = S2.row_ptr[i-1]; j < S2.row_ptr[i]; j++){
+				printf("S2[%d][%d] = %f\n", i-1, S2.col_ind[j], S2.val[j]);
+			}
+		}
+		
+	
+	double *U1 = array(N);
+	double *U2 = array(N);
 
 	/* Fill F */
 	double *F = array(N);
@@ -428,9 +638,19 @@ int main(int argc, char **argv)
 		struct Vertex v = m.vertices[i];
 		F[i] = f(v.x, v.y, v.z);
 	}
+
+	matrix_vector_product(&S1, F, U1);
+	matrix_vector_product(&S2, F, U2);
+
+	blas_axpby(1, U1, -1, U2, N);
+	for (int i = 0; i < N; i++)
+		assert(fabs(U2[i]) < 1e-10);
+
 	/* Fill B = MF */
 	double *B = array(N);
 	matrix_vector_product(&M, F, B);
+
+	
 
 	/* Solve (S + M)U = B */
     double error;
