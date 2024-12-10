@@ -51,3 +51,5 @@ struct SKLMatrix : public Matrix {
 			      const double *__restrict b) const;
 };
 
+void spy(const SKLMatrix &L, uint32_t width, const char *fname);
+

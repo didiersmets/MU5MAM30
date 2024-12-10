@@ -15,29 +15,33 @@ if (USE_OPENMP)
 	find_package(OpenMP)
 endif()
 add_library(nanofem
+	src/fem/P1.cpp
+	src/fem/poisson.cpp
+	src/fem/navier_stokes.cpp
+	src/linalg/conjugate_gradient.cpp
+	src/linalg/cholesky.cpp
+	src/matrix/fem_matrix.cpp
+	src/matrix/sparse_matrix.cpp
+	src/matrix/spy.cpp
 	src/mesh/adjacency.cpp
 	src/mesh/cube.cpp
+	src/mesh/cube2.cpp
 	src/mesh/sphere.cpp
 	src/mesh/duplicate_verts.cpp
 	src/mesh/mesh_io.cpp
 	src/mesh/mesh_bounds.cpp
-	src/linalg/sparse_matrix.cpp
-	src/linalg/conjugate_gradient.cpp
-	src/linalg/cholesky.cpp
-	src/fem/fem_matrix.cpp
-	src/fem/P1.cpp
-	src/fem/poisson.cpp
-	src/fem/navier_stokes.cpp
 )
 target_include_directories(nanofem PUBLIC 
 	include/common 
-	include/mesh 
 	include/fem
 	include/linalg
+	include/matrix 
+	include/mesh 
 	extern
 )
 target_compile_options(nanofem PRIVATE 
 	-std=c++17 -Wall -Wextra -ffast-math -march=native -Wno-unknown-pragmas
+	-Wno-missing-field-initializers
 )
 if (USE_OPENMP AND OpenMP_CXX_FOUND)
 	target_compile_options(nanofem PRIVATE -DUSE_OPENMP)
@@ -94,15 +98,15 @@ target_link_libraries(test_NS PRIVATE nanofem nanoviewer tiny_expr)
 ###############################################################################
 
 ###############################################################################
-add_executable(test_Cholesky
+add_executable(test_ordering
 	src/common/logging.cpp
 	src/common/chrono.cpp
-	src/bin/test_cholesky.cpp
+	src/bin/test_ordering.cpp
 )
-target_compile_options(test_Cholesky PRIVATE 
+target_compile_options(test_ordering PRIVATE 
 	-std=c++17 -Wall -Wextra -Wno-missing-field-initializers
 )
-target_link_libraries(test_Cholesky PRIVATE nanofem)
+target_link_libraries(test_ordering PRIVATE nanofem)
 ###############################################################################
 
 ###############################################################################

@@ -160,7 +160,9 @@ static void syntax(char *prg_name)
 static int load_mesh(Mesh &mesh, int argc, char **argv)
 {
 	int res = -1;
-	if (argc > 2 && strncmp(argv[1], "cube", 4) == 0) {
+	if (argc > 2 && strncmp(argv[1], "cube2", 5) == 0) {
+		res = load_cube_nested_dissect(mesh, atoi(argv[2]));
+	} else if (argc > 2 && strncmp(argv[1], "cube", 4) == 0) {
 		res = load_cube(mesh, atoi(argv[2]));
 	} else if (argc > 2 && strncmp(argv[1], "sphere", 5) == 0) {
 		res = load_sphere(mesh, atoi(argv[2]));
@@ -264,8 +266,10 @@ static void draw_scene(const Viewer &viewer, int shader,
 	Mat4 vm = camera.world_to_view();
 	Vec3 camera_pos = camera.get_position();
 	glUniformMatrix4fv(glGetUniformLocation(shader, "vm"), 1, 0, &vm(0, 0));
-	glUniformMatrix4fv(glGetUniformLocation(shader, "proj"), 1, 0, &proj(0, 0));
-	glUniform3fv(glGetUniformLocation(shader, "camera_pos"), 1, &camera_pos[0]);
+	glUniformMatrix4fv(glGetUniformLocation(shader, "proj"), 1, 0,
+			   &proj(0, 0));
+	glUniform3fv(glGetUniformLocation(shader, "camera_pos"), 1,
+		     &camera_pos[0]);
 	glUniform1f(glGetUniformLocation(shader, "scale_min"), scale_min);
 	glUniform1f(glGetUniformLocation(shader, "scale_max"), scale_max);
 	glUniform1f(glGetUniformLocation(shader, "deform"), mesh_deform);
