@@ -4,16 +4,24 @@
 #include "array.h"
 #include "matrix.h"
 
-/* Compressed Sparse Row pattern */
+/******************************************************************************
+ *
+ * Compressed Sparse Row matrix
+ *
+ *****************************************************************************/
+
 struct CSRPattern {
-	// Non zero entries on line i (0 <= i < rows)
-	// are stored at indices row_start(i) <= k < row_start(i + 1).
-	// Corresponding column indices are read into col(k).
+	bool symmetric;
+	size_t rows;
+	size_t cols;
+	size_t nnz;
+	/* Non zero entries on line i (0 <= i < rows)
+	 * are stored at indices row_start(i) <= k < row_start(i + 1).
+	 * Corresponding column indices are read into col(k). */
 	TArray<uint32_t> row_start; /* Size = nrows + 1 */
 	TArray<uint32_t> col; /* Size = nnz */
 };
 
-/* Compressed Sparse Row matrix */
 struct CSRMatrix : public Matrix {
 	bool symmetric = false;
 	size_t nnz; /* Number of (non zero) entries */
@@ -25,20 +33,27 @@ struct CSRMatrix : public Matrix {
 	double &operator()(uint32_t i, uint32_t j);
 };
 
-/* Skyline Lower triangular pattern */
+/* Visualisation of non zeros */
+void spy(const CSRPattern &P, uint32_t width, const char *fname);
+
+/******************************************************************************
+ *
+ * SKyLine sparse matrix
+ *
+ *****************************************************************************/
+
 struct SKLPattern {
 	TArray<size_t> row_start; /* Size = nrows + 1 */
 	TArray<uint32_t> jmin; /* Size = nrows */
 };
 
-/* Skyline sparse matrix, lower triangular or symmetric
- * In both cases, the entries above the diagonal are not recorded. */
 struct SKLMatrix : public Matrix {
 	bool symmetric;
 	size_t nnz; /* Number of (non zero) entries */
-	// Non zero entries on line i (0 <= i < rows) are stored at indices
-	// row_start(i) <= k < row_start(i + 1).
-	// Column indices j for nnz coeffs on line i are those jmin(i) <= j <= i
+	/* Non zero entries on line i (0 <= i < rows) are stored at indices
+	 * row_start(i) <= k < row_start(i + 1).
+	 * Column idx j for nz coeffs on line i are those jmin(i) <= j <= i
+	 */
 	size_t *row_start;
 	uint32_t *jmin;
 	TArray<double> data; /* Size = nnz */
@@ -51,5 +66,6 @@ struct SKLMatrix : public Matrix {
 			      const double *__restrict b) const;
 };
 
+/* Visualisation of non zeros */
 void spy(const SKLMatrix &L, uint32_t width, const char *fname);
 
