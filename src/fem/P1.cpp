@@ -2,16 +2,16 @@
 #include <string.h>
 
 #ifdef USE_OPENMP
-#include <omp.h>
+	#include <omp.h>
 #endif
 
 #include "P1.h"
-#include "mass.h"
-#include "stiffness.h"
 #include "adjacency.h"
 #include "fem_matrix.h"
+#include "mass.h"
 #include "mesh.h"
 #include "sparse_matrix.h"
+#include "stiffness.h"
 
 /* FEMatrix variants */
 
@@ -36,12 +36,12 @@ void build_P1_mass_matrix(const Mesh &m, FEMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M.diag[a] += Mloc[0];
@@ -72,12 +72,12 @@ void build_P1_stiffness_matrix(const Mesh &m, FEMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S.diag[a] += Sloc[0];
@@ -154,12 +154,6 @@ void build_P1_CSRPattern(const Mesh &m, CSRPattern &P)
 			}
 		}
 	}
-	/* Compute fill-in of SkyLine format */
-	size_t skc = 0;
-	for (size_t i = 0; i < vtx_count; ++i) {
-		skc += 1 + i - P.col[P.row_start[i]];
-	}
-	printf("Skyline fill-in : %zu (%lf)\n", skc, pow(vtx_count, 1.5));
 }
 
 void build_P1_mass_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &M)
@@ -186,12 +180,12 @@ void build_P1_mass_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M(a, a) += Mloc[0];
@@ -227,12 +221,12 @@ void build_P1_stiffness_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S(a, a) += Sloc[0];
@@ -299,12 +293,12 @@ void build_P1_mass_matrix(const Mesh &m, const SKLPattern &P, SKLMatrix &M)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Mloc[2];
 		mass(AB, AC, Mloc);
 		M(a, a) += Mloc[0];
@@ -339,12 +333,12 @@ void build_P1_stiffness_matrix(const Mesh &m, const SKLPattern &P, SKLMatrix &S)
 		Vec3f A = m.positions[a];
 		Vec3f B = m.positions[b];
 		Vec3f C = m.positions[c];
-		Vec3d AB = { (double)B[0] - (double)A[0],
-			     (double)B[1] - (double)A[1],
-			     (double)B[2] - (double)A[2] };
-		Vec3d AC = { (double)C[0] - (double)A[0],
-			     (double)C[1] - (double)A[1],
-			     (double)C[2] - (double)A[2] };
+		Vec3d AB = {(double)B[0] - (double)A[0],
+			    (double)B[1] - (double)A[1],
+			    (double)B[2] - (double)A[2]};
+		Vec3d AC = {(double)C[0] - (double)A[0],
+			    (double)C[1] - (double)A[1],
+			    (double)C[2] - (double)A[2]};
 		double Sloc[6];
 		stiffness(AB, AC, Sloc);
 		S(a, a) += Sloc[0];

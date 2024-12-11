@@ -22,6 +22,7 @@ add_library(nanofem
 	src/linalg/cholesky.cpp
 	src/matrix/fem_matrix.cpp
 	src/matrix/sparse_matrix.cpp
+	src/matrix/elimination_tree.cpp
 	src/matrix/spy.cpp
 	src/mesh/adjacency.cpp
 	src/mesh/cube.cpp
