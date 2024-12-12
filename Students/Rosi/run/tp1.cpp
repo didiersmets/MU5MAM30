@@ -8,7 +8,7 @@
 
 #define FAST 0
 #define CONJ 0
-#define CRSMATRIX 1
+#define CRSMATRIX 0
 
 
 /* The goal of this TP is to get acquainted with C (not yet C++)
