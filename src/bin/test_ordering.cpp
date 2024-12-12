@@ -38,13 +38,6 @@ int main(int argc, char **argv)
 		LOG_MSG("S   NNZ : %10zu", snnz);
 		LOG_MSG("SKL RAW : %10zu (ratio = %5.1f)", S1.nnz,
 			(float)S1.nnz / snnz);
-		size_t phi = 0;
-		for (size_t i = 0; i < S1.rows; ++i) {
-			size_t eta = S1.row_start[i + 1] - S1.row_start[i];
-			phi += eta * eta;
-		}
-		LOG_MSG("L   PHI : %10zu (%.2f GFlops)", phi,
-			double(phi) / 1e9);
 		in_place_cholesky_factorization(S1);
 		size_t lnnz = 0;
 		for (size_t i = 0; i < S1.nnz; ++i) {

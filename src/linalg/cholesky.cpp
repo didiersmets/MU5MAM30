@@ -127,7 +127,6 @@ void csr_cholesky_factorization(const CSRMatrix &A, const CSRPattern &PL,
 	L.data.resize(L.nnz);
 
 	L.data[0] = sqrt(A.data[0]);
-	size_t hotloop = 0;
 	for (uint32_t i = 1; i < n; ++i) {
 		/* Solve L_{upper block < i} */
 		uint32_t starti = PL.row_start[i];
@@ -142,7 +141,6 @@ void csr_cholesky_factorization(const CSRMatrix &A, const CSRPattern &PL,
 			uint32_t kj = startj;
 			double dot = 0;
 			while (ki < k && kj < stopj) {
-				hotloop++;
 				uint32_t colki = PL.col[ki];
 				uint32_t colkj = PL.col[kj];
 				if (colkj == colki) {
@@ -160,7 +158,6 @@ void csr_cholesky_factorization(const CSRMatrix &A, const CSRPattern &PL,
 		/* TODO add Aii */
 		L.data[stopi] = sqrt(1234 - norm2);
 	}
-	printf("Hotloop : %.2f GFlop\n", (double)hotloop / 1e9);
 }
 
 /*******************************************************************************
