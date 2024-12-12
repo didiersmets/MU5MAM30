@@ -1,9 +1,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stbi/stb_image_write.h"
 
-#include "sys_utils.h"
 #include "math_utils.h"
 #include "sparse_matrix.h"
+#include "sys_utils.h"
 
 void spy(const SKLMatrix &A, uint32_t w, const char *fname)
 {
@@ -13,13 +13,14 @@ void spy(const SKLMatrix &A, uint32_t w, const char *fname)
 	}
 
 	uint32_t n = A.rows;
+	float invn = 1.f / n;
 	for (uint32_t i = 0; i < n; ++i) {
-		int py = (w * i) / n;
+		uint32_t py = (int)round(float(i) * invn * w);
 		uint32_t start = A.row_start[i];
 		uint32_t end = A.row_start[i + 1];
 		uint32_t j = A.jmin[i];
 		for (uint32_t k = start; k < end; ++k, ++j) {
-			uint32_t px = (w * j) / n;
+			uint32_t px = (int)round(float(j) * invn * w);
 			uint8_t *pix = data + w * py + px;
 			if (A.data[k] != 0) {
 				*pix = MIN(0, *pix);
@@ -41,13 +42,14 @@ void spy(const CSRPattern &P, uint32_t w, const char *fname)
 	}
 
 	uint32_t n = P.rows;
-	for (uint32_t i = 0; i < n; ++i) {
-		int py = (w * i) / n;
+	float invn = 1.f / n;
+	for (size_t i = 0; i < n; ++i) {
+		uint32_t py = (int)round(float(i) * invn * w);
 		uint32_t start = P.row_start[i];
 		uint32_t end = P.row_start[i + 1];
 		for (uint32_t k = start; k < end; ++k) {
 			uint32_t j = P.col[k];
-			uint32_t px = (w * j) / n;
+			uint32_t px = (int)round(float(j) * invn * w);
 			uint8_t *pix = data + w * py + px;
 			*pix = 0;
 		}

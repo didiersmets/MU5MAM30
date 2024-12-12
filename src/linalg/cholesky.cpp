@@ -1,10 +1,10 @@
+#include <algorithm>
 #include <assert.h>
 #include <math.h>
-#include <algorithm>
 
-#include "sparse_matrix.h"
 #include "elimination_tree.h"
 #include "math_utils.h"
+#include "sparse_matrix.h"
 
 /*******************************************************************************
  * CSR version
@@ -81,9 +81,9 @@ void csr_build_cholesky_pattern(const CSRPattern &PA, CSRPattern &PL)
 	PL.nnz = PL.row_start[n];
 	PL.col.resize(PL.nnz);
 
-	/* Fill pass 
-	 * Note : 
-	 *   - Fill-in cols j in line i may not be discovered in order 
+	/* Fill pass
+	 * Note :
+	 *   - Fill-in cols j in line i may not be discovered in order
 	 *   - Therefore a posteriori sort
 	 */
 	TArray<uint32_t> offset(n);
@@ -111,21 +111,56 @@ void csr_build_cholesky_pattern(const CSRPattern &PA, CSRPattern &PL)
 	}
 }
 
-/* Sparse up-looking Cholesky factorization. 
+/* Sparse up-looking Cholesky factorization.
  * Cfr. Scott & Tuma Algo 5.7 page 79
  */
-void csr_cholesky_factorization(CSRMatrix &A, const CSRPattern &PL,
+void csr_cholesky_factorization(const CSRMatrix &A, const CSRPattern &PL,
 				CSRMatrix &L)
 {
 	uint32_t n = A.rows;
-	A.data[0] = sqrt(A.data[0]);
+
+	L.symmetric = true;
+	L.rows = L.cols = n;
+	L.row_start = PL.row_start.data;
+	L.col = PL.col.data;
+	L.nnz = PL.nnz;
+	L.data.resize(L.nnz);
+
+	L.data[0] = sqrt(A.data[0]);
+	size_t hotloop = 0;
 	for (uint32_t i = 1; i < n; ++i) {
 		/* Solve L_{upper block < i} */
+		uint32_t starti = PL.row_start[i];
+		uint32_t stopi = PL.row_start[i + 1] - 1;
+		double norm2 = 0.0;
+		for (size_t k = starti; k < stopi; ++k) {
+			uint32_t j = PL.col[k];
+			uint32_t startj = PL.row_start[j];
+			uint32_t stopj = PL.row_start[j + 1] - 1;
+			/* Sparse dot of Li and Lj */
+			uint32_t ki = starti;
+			uint32_t kj = startj;
+			double dot = 0;
+			while (ki < k && kj < stopj) {
+				hotloop++;
+				uint32_t colki = PL.col[ki];
+				uint32_t colkj = PL.col[kj];
+				if (colkj == colki) {
+					dot += L.data[colki] * L.data[colkj];
+				}
+				kj += (colkj <= colki);
+				ki += (colki <= colkj);
+			}
+			/* TODO add Aij */
+			double Ljj = L.data[stopj];
+			double Lij = 1.234 - dot / Ljj;
+			L.data[k] = Lij;
+			norm2 += Lij * Lij;
+		}
+		/* TODO add Aii */
+		L.data[stopi] = sqrt(1234 - norm2);
 	}
-	/* TODO (finish) */
-	(void)PL;
-	(void)L;
-	exit(0);
+	printf("Hotloop : %.2f GFlop\n", (double)hotloop / 1e9);
 }
 
 /*******************************************************************************

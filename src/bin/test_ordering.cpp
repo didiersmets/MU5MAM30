@@ -29,6 +29,7 @@ int main(int argc, char **argv)
 		SKLPattern P1;
 		SKLMatrix S1;
 		build_P1_SKLPattern(m1, P1);
+
 		build_P1_stiffness_matrix(m1, P1, S1);
 		size_t snnz = 0;
 		for (size_t i = 0; i < S1.nnz; ++i) {
@@ -37,6 +38,13 @@ int main(int argc, char **argv)
 		LOG_MSG("S   NNZ : %10zu", snnz);
 		LOG_MSG("SKL RAW : %10zu (ratio = %5.1f)", S1.nnz,
 			(float)S1.nnz / snnz);
+		size_t phi = 0;
+		for (size_t i = 0; i < S1.rows; ++i) {
+			size_t eta = S1.row_start[i + 1] - S1.row_start[i];
+			phi += eta * eta;
+		}
+		LOG_MSG("L   PHI : %10zu (%.2f GFlops)", phi,
+			double(phi) / 1e9);
 		in_place_cholesky_factorization(S1);
 		size_t lnnz = 0;
 		for (size_t i = 0; i < S1.nnz; ++i) {
@@ -67,7 +75,17 @@ int main(int argc, char **argv)
 			"log2(NNZ))",
 			P3.nnz, (float)P3.nnz / S2.nnz,
 			(float)P3.nnz / (S2.nnz * log2(S2.nnz)));
-		spy(P3, 1024, "./data/spy_dissected_cube.png");
+		size_t phi = 0;
+		for (size_t i = 0; i < P3.rows; ++i) {
+			size_t eta = P3.row_start[i + 1] - P3.row_start[i];
+			phi += eta * eta;
+		}
+		LOG_MSG("L   PHI : %10zu (%.2f GFlops)", phi,
+			double(phi) / 1e9);
+		csr_cholesky_factorization(S2, P3, S3);
+		LOG_MSG("Cholesky finished");
+
+		// spy(P3, 1024, "./data/spy_dissected_cube.png");
 	}
 
 	return (0);
