@@ -5,16 +5,16 @@
 	#include <omp.h>
 #endif
 
+#include "math_utils.h"
 #include "P1.h"
 #include "fem_matrix.h"
 #include "adjacency.h"
 #include "my_mesh.h"
 #include "sparse_matrix.h"
+#include "skyline.h"
 
-void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
+void mvp_P1(const FEMatrix &A, const double *x, double *y)
 {
-	//assert(A.fem_type == FEMatrix::P1_cst);
-
 	size_t vtx_count = A.m->vtx_count;
 	size_t tri_count = A.m->tri_count;
 
@@ -40,10 +40,8 @@ void mvp_P1_cst(const FEMatrix &A, const double *x, double *y)
 	}
 }
 
-double sum_P1_cst(const FEMatrix &A)
+double sum_P1(const FEMatrix &A)
 {
-	//assert(A.fem_type == FEMatrix::P1_cst);
-
 	size_t vtx_count = A.m->vtx_count;
 	size_t tri_count = A.m->tri_count;
 
@@ -61,119 +59,6 @@ double sum_P1_cst(const FEMatrix &A)
 #endif
 	for (size_t t = 0; t < tri_count; ++t) {
 		sum2 += 6 * A.off_diag[t];
-	}
-
-	return sum1 + sum2;
-}
-
-void mvp_P1_sym(const FEMatrix &A, const double *x, double *y)
-{
-	//assert(A.fem_type == FEMatrix::P1_sym);
-
-	size_t vtx_count = A.m->vtx_count;
-	size_t tri_count = A.m->tri_count;
-	
-
-#ifdef USE_OPENMP
-	#pragma omp parallel for
-#endif
-	for (size_t v = 0; v < vtx_count; ++v) {
-		y[v] = A.diag[v] * x[v];
-	}
-
-	// #pragma omp parallel for
-	for (size_t t = 0; t < tri_count; ++t) {
-		uint32_t a = A.m->triangles[t].x;
-		uint32_t b = A.m->triangles[t].y;
-		uint32_t c = A.m->triangles[t].z;
-		y[a] += A.off_diag[3 * t + 0] * x[b];
-		y[b] += A.off_diag[3 * t + 0] * x[a];
-		y[b] += A.off_diag[3 * t + 1] * x[c];
-		y[c] += A.off_diag[3 * t + 1] * x[b];
-		y[c] += A.off_diag[3 * t + 2] * x[a];
-		y[a] += A.off_diag[3 * t + 2] * x[c];
-	}
-}
-
-double sum_P1_sym(const FEMatrix &A)
-{
-	//assert(A.fem_type == FEMatrix::P1_sym);
-
-	size_t vtx_count = A.m->vtx_count;
-	size_t tri_count = A.m->tri_count;
-
-	double sum1 = 0.0;
-#ifdef USE_OPENMP
-	#pragma omp parallel for reduction(+ : sum1)
-#endif
-	for (size_t v = 0; v < vtx_count; ++v) {
-		sum1 += A.diag[v];
-	}
-
-	double sum2 = 0;
-#ifdef USE_OPENMP
-	#pragma omp parallel for reduction(+ : sum2)
-#endif
-	for (size_t t = 0; t < tri_count; ++t) {
-		sum2 += 2 * A.off_diag[3 * t + 0];
-		sum2 += 2 * A.off_diag[3 * t + 1];
-		sum2 += 2 * A.off_diag[3 * t + 3];
-	}
-
-	return sum1 + sum2;
-}
-
-void mvp_P1_gen(const FEMatrix &A, const double *x, double *y)
-{
-	//assert(A.fem_type == FEMatrix::P1_sym);
-
-	size_t vtx_count = A.m->vtx_count;
-	size_t tri_count = A.m->tri_count;
-	
-
-	for (size_t v = 0; v < vtx_count; ++v) {
-		y[v] = A.diag[v] * x[v];
-	}
-
-	for (size_t t = 0; t < tri_count; ++t) {
-		uint32_t a = A.m->triangles[t].x;
-		uint32_t b = A.m->triangles[t].y;
-		uint32_t c = A.m->triangles[t].z;
-		y[a] += A.off_diag[6 * t + 0] * x[b];
-		y[b] += A.off_diag[6 * t + 1] * x[a];
-		y[b] += A.off_diag[6 * t + 2] * x[c];
-		y[c] += A.off_diag[6 * t + 3] * x[b];
-		y[c] += A.off_diag[6 * t + 4] * x[a];
-		y[a] += A.off_diag[6 * t + 5] * x[c];
-	}
-}
-
-double sum_P1_gen(const FEMatrix &A)
-{
-	//assert(A.fem_type == FEMatrix::P1_sym);
-
-	size_t vtx_count = A.m->vtx_count;
-	size_t tri_count = A.m->tri_count;
-
-	double sum1 = 0.0;
-#ifdef USE_OPENMP
-	#pragma omp parallel for reduction(+ : sum1)
-#endif
-	for (size_t v = 0; v < vtx_count; ++v) {
-		sum1 += A.diag[v];
-	}
-
-	double sum2 = 0.0;
-#ifdef USE_OPENMP
-	#pragma omp parallel for reduction(+ : sum2)
-#endif
-	for (size_t t = 0; t < tri_count; ++t) {
-		sum2 += A.off_diag[6 * t + 0];
-		sum2 += A.off_diag[6 * t + 1];
-		sum2 += A.off_diag[6 * t + 2];
-		sum2 += A.off_diag[6 * t + 3];
-		sum2 += A.off_diag[6 * t + 4];
-		sum2 += A.off_diag[6 * t + 5];
 	}
 
 	return sum1 + sum2;
@@ -246,6 +131,32 @@ void build_P1_CSRPattern(const Mesh &m, CSRPattern &P)
 
 static void stiffness(const Vec3d &AB, const Vec3d &AC, double *__restrict S);
 static void mass(const Vec3d &AB, const Vec3d &AC, double *__restrict M);
+
+void inline mass(const Vec3d &AB, const Vec3d &AC, double *__restrict M)
+{
+	M[0] = norm(cross(AB, AC)) / 12;
+	M[1] = M[0] / 2;
+}
+
+void inline stiffness(const Vec3d &AB, const Vec3d &AC, double *__restrict S)
+{
+	double ABAB = norm2(AB);
+	double ACAC = norm2(AC);
+	double ABAC = dot(AB, AC);
+	double mult = 0.5 / sqrt(ABAB * ACAC - ABAC * ABAC);
+	ABAB *= mult;
+	ACAC *= mult;
+	ABAC *= mult;
+
+	S[0] = ACAC - 2 * ABAC + ABAB;
+	S[1] = ACAC;
+	S[2] = ABAB;
+	S[3] = ABAC - ACAC;
+	/* Note the chosen order : (B,C)-> 4 and (C,A) -> 5 */
+	S[4] = -ABAC;
+	S[5] = ABAC - ABAB;
+}
+
 
 void build_P1_mass_matrix(const Mesh &m, FEMatrix &M)
 {
@@ -407,106 +318,78 @@ void build_P1_stiffness_matrix(const Mesh &m, const CSRPattern &P, CSRMatrix &S)
 	}
 }
 
-/* Given a triangle ABC, computes the (symmetric) 3x3 mass M s.t.
- *
- *   M_{ij} := \int_{ABC} \phi_i \phi_j
- *
- * where \phi_0 := \phi_A, \phi_1 := \phi_B, \phi_2 := \phi_C
- * are the shape functions of the P1 Lagrange element associated
- * to ABC.
- *
- * Idea behind computation :
- * -------------------------
- *
- * We denote by \Psi the affine map
- *
- *    \Psi(s,t) = sB + tC + (1-s-t)A.
- *
- * Then \Psi maps the reference simplex in R^2 (we denote it by A'B'C')
- * onto ABC, and since \Psi is affine \phi_X = Psi \circ \phi_X' for
- * any X in {A, B, C}. Moreover by the change of variable formula, for
- * arbitrary X, Y in {A, B, C} :
- *
- *    \int_{ABC} \phi_X \phi_Y = \int_{A'B'C'} \phi_X' \phi_Y' |Jac(\Psi)|dsdt
- *
- * where the Jacobian |Jac(\Psi)| is constant equal to |ABC|/|A'B'C'| = 2|ABC|.
- *
- * Besides, elementary integration shows that
- *
- *               (2  1  1)
- * M' = (1/24) * (1  2  1)
- *               (1  1  2)
- *
- * We therefore only return |ABC|/6 and |ABC|/12, with |ABC| = |AB x AC| / 2.
- */
-void inline mass(const Vec3d &AB, const Vec3d &AC, double *__restrict M)
-{
-	M[0] = norm(cross(AB, AC)) / 12;
-	M[1] = M[0] / 2;
-}
+void build_P1_stiffness_matrix(const Mesh &m, SkylineMatrix &S){
+	size_t N = m.vtx_count;
+	size_t tri_count = m.tri_count;
 
-/* Given a triangle ABC, computes the (symmetric) 3x3 stiffness matrix S s.t.
- *
- *   S_{ij} := \int_{ABC} \nabla \phi_i \cdot \nabla \phi_j
- *
- * where \phi_0 := \phi_A, \phi_1 := \phi_B, \phi_2 := \phi_C
- * are the shape functions of the P1 Lagrange element associated
- * to ABC.
- *
- * Input : the vectors AB and AC.
- * Output: the six coefficients S_{00} S_{11} S_{22} S_{01} S_{12} S_{20},
- *         corresponding to the interactions A<->A, B<->B, C<->C, A<->B, B<->C,
- *         C<->A
- *
- * Idea behind computation :
- * -------------------------
- *
- * We denote by a, b, c the angles at A, B, C; and by n_A, n_B, n_C the
- * inward normals to the segments opposite to A, B, C.
- *
- * We have :
- *
- *     \nabla \phi_B = 1/(|AB|sin(a)) * n_B
- *     \nabla \phi_C = 1/(|CA|sin(a)) * n_C
- *     n_B \cdot n_C = -cos(a)
- *     2|ABC| = |CA x AB| = |CA| * |AB| * sin(a)
- *     dot(CA, AB) = -|CA| |AB| cos(a)
- *
- * hence :
- *
- *     S_{BC} = -1/2 * cot(a) =  dot(CA, AB) / (4|ABC|)
- *
- * and similarly for S_{AB} and S_{CA}.
- *
- * Also :
- *
- *     \nabla \phi_A = 1/(|AB|sin(b)) * n_A
- *                   = 1/(|CA|sin(c)) * n_A
- *
- * hence :
- *
- *     S_{A,A} = |ABC| / (|AB||CA|sin(b)sin(c)) = |BC|^2 / (4|ABC|)
- *
- * and similarly for S_{BB} and S_{CC}.
- *
- * Taking into account that BC = AC - AB, we simplify the above expressions
- * into the following.
- */
-void inline stiffness(const Vec3d &AB, const Vec3d &AC, double *__restrict S)
-{
-	double ABAB = norm2(AB);
-	double ACAC = norm2(AC);
-	double ABAC = dot(AB, AC);
-	double mult = 0.5 / sqrt(ABAB * ACAC - ABAC * ABAC);
-	ABAB *= mult;
-	ACAC *= mult;
-	ABAC *= mult;
+	S.symmetric = true;
+	S.rows = S.cols = N;
+	
+	S.J.resize(N);
+	S.val.resize(9 * tri_count);
+	S.start.resize(N);
+	for (int i = 0; i < S.rows; i++) {
+		S.J[i] = i;
+	}
+	
+	//First I loop for all the triangles to fill the J array
+	
+	for (int i = 0; i < tri_count; i++){
+		int a = m.triangles[i].x;
+		int b = m.triangles[i].y;
+		int c = m.triangles[i].z;
+		assert(a < N);
+		assert(b < N);
+		assert(c < N);
 
-	S[0] = ACAC - 2 * ABAC + ABAB;
-	S[1] = ACAC;
-	S[2] = ABAB;
-	S[3] = ABAC - ACAC;
-	/* Note the chosen order : (B,C)-> 4 and (C,A) -> 5 */
-	S[4] = -ABAC;
-	S[5] = ABAC - ABAB;
+		if(MIN(a,b) < S.J[MAX(a,b)]){
+			S.J[MAX(a,b)] = MIN(a,b);
+		}
+		if(MIN(a,c) < S.J[MAX(a,c)]){
+			S.J[MAX(a,c)] = MIN(a,c);
+		}
+		if(MIN(b,c) < S.J[MAX(b,c)]){
+			S.J[MAX(b,c)] = MIN(b,c);
+		}
+	
+	}
+	
+	//Then I fill the start array
+
+	S.start[0] = 0;
+	
+	for (int i = 1; i < N; i++){
+		S.start[i] = S.start[i-1] + i - S.J[i];
+	}
+	S.nnz = S.start[N - 1] + N - S.J[N - 1];
+	S.val.resize(S.nnz);
+	for (int i = 0; i < S.nnz; i++){
+		S.val[i] = 0;
+	}
+	/* We fill the matrix S*/
+
+	for (int i = 0; i < tri_count; i++) {
+		int a = m.triangles[i].x;
+		int b = m.triangles[i].y;
+		int c = m.triangles[i].z;
+		assert(a < N);
+		assert(b < N);
+		assert(c < N);
+		Vec3d A = m.vertices[a];
+		Vec3d B = m.vertices[b];
+		Vec3d C = m.vertices[c];
+		Vec3d AB = B - A;
+		Vec3d BC = C - B;
+		Vec3d CA = A - C;
+
+		Vec3d CAxAB = cross(CA, AB);
+		double area = 0.5 * norm(CAxAB);
+		double r = 1. / (4 * area);
+		S.val[S.start[a] + a - S.J[a]] += dot(BC, BC) * r;
+		S.val[S.start[b] + b - S.J[b]] += dot(CA, CA) * r;
+		S.val[S.start[c] + c - S.J[c]] += dot(AB, AB) * r;
+		S.val[S.start[MIN(a,b)] + MAX(a,b) - S.J[MIN(a,b)]] += dot(CA, BC) * r;
+		S.val[S.start[MIN(a,c)] + MAX(a,c) - S.J[MIN(a,c)]] += dot(AB, BC) * r;
+		S.val[S.start[MIN(b,c)] + MAX(b,c) - S.J[MIN(b,c)]] += dot(AB, CA) * r;
+	}
 }
